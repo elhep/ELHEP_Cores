@@ -1,14 +1,19 @@
 import random
-import cocotb
+from itertools import product
+from random import randint
+from collections import namedtuple
 
+import cocotb
 from cocotb.triggers import Timer, RisingEdge, FallingEdge, Combine, Join, First
 from cocotb.clock import Clock
 from cocotb.result import TestFailure
-from gateware.simulation.cocotb_rtlink import RtLinkCSR
-from itertools import product
-from random import randint
 
-from collections import namedtuple
+import os
+print(os.environ)
+import sys
+print(sys.path)
+
+from elhep_cores.simulation.cocotb_rtlink import RtLinkCSR
 
 
 def int_to_bits(i, length):
@@ -168,30 +173,3 @@ def first_test(dut):
     yield First(Timer(5000, 'ns'), RisingEdge(dut.bitslip_done))
 
     yield Timer(5000, 'ns')
-
-    
-
-    # regs = ["frame_length", "frame_delay_value", "data_delay_value"]
-    # for r, ch in product(regs, range(4)):
-    #     print(r, ch)
-    #     v = randint(0, 31)
-    #     reg = getattr(tb.channel_csr[ch], r)
-    #     yield reg.write(v)
-    #     readout = yield reg.read()
-    #     readout = readout.value.integer
-    #     if readout != v:
-    #         raise TestFailure("CSR readout error at channel {}, expected 0x{:02x}, got 0x{:02x}".format(ch, v, readout))
-
-
-# @cocotb.test()
-# def data_test(dut):
-#     tb = TbTdcGpx2Phy(dut, 100, 125)
-#     yield tb.initialize()
-
-#     lengths = [14, 20, 38, 44]*5
-#     values = [randint(0, 2**l-1) for l in lengths]
-
-#     monitors = [Join(cocotb.fork(tb.data_out_monitor(ch, values, lengths))) for ch in range(4)]
-#     drivers = [Join(cocotb.fork(tb.frame_driver(ch, values, lengths))) for ch in range(4)]
-
-#     yield Combine(*monitors, *drivers)

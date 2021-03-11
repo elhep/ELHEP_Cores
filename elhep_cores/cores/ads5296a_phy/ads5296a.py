@@ -4,8 +4,8 @@ from migen.genlib.io import DifferentialInput
 from migen.genlib.cdc import PulseSynchronizer, MultiReg
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
-from gateware.cores.xilinx import XilinxIdelayE2
-from gateware.cores.rtlink_csr import RtLinkCSR
+from elhep_cores.cores.xilinx import XilinxIdelayE2
+from elhep_cores.cores.rtlink_csr import RtLinkCSR
 
 from artiq.gateware import rtio
 
@@ -228,7 +228,7 @@ class SimulationWrapper(Module):
 if __name__ == "__main__":
 
     from migen.build.xilinx import common
-    from gateware.simulation.common import update_tb
+    from elhep_cores.simulation.common import update_tb
 
     module = SimulationWrapper()
     so = dict(common.xilinx_special_overrides)
@@ -238,8 +238,8 @@ if __name__ == "__main__":
                     name="top",
                     special_overrides=so,
                     ios=module.io,
-                    create_clock_domains=False).write('ADS5296A_XS7.v')
-    # update_tb('gateware/cores/tests/adc_phy_daq/adc_phy_daq.v')
+                    create_clock_domains=False).write('dut.v')
+    # update_tb('dut.v')
 
 
 

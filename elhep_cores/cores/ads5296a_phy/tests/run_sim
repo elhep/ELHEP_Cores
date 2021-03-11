@@ -1,17 +1,1 @@
-#!/bin/bash
-
-python -m gateware.cores.phy.ads5296a.ads5296a
-
-if [ -z "$XILINX_VIVADO" ]
-then
-    echo "Session not configured for using Vivado. Source settings64.sh!"
-    exit -1
-fi
-
-mkdir -p build
-cd build
-
-xvlog --sv ../ADS5296A_XS7.v ../tb_ADS5296A_XS7.v $XILINX_VIVADO/data/verilog/src/glbl.v
-xelab --timescale 1ns/1ps -L work -L xpm -L unisims_ver -L unimacro_ver -L secureip tb_ADS5296A_XS7 glbl
-xsim work.tb_ADS5296A_XS7#work.glbl -t ../xsim_run.tcl
-
+PYTHONPATH="/home/ms/projects/elhep_cores/elhep_cores/cores/ads5296a_phy/tests/../../../.." make
