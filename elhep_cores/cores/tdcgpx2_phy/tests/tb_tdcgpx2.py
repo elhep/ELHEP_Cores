@@ -69,7 +69,7 @@ class TbTdcGpx2Phy:
 
     @cocotb.coroutine
     def generate_frame_signal(self, ch, frame_offset):
-        offset = self.clk_period_ps / 2.0 + frame_offset
+        offset = self.clk_period_ps / 4.0 + frame_offset
         yield self.re
         yield Timer(offset)
         self.set_diff("frame", ch, 1)
@@ -78,8 +78,7 @@ class TbTdcGpx2Phy:
 
     @cocotb.coroutine
     def generate_data_signal(self, ch, bits, data_offset):
-        offset = self.clk_period_ps/2.0+data_offset
-
+        offset = self.clk_period_ps / 4.0+data_offset
         yield self.re
         yield Timer(offset)
         for b in bits:
@@ -115,38 +114,18 @@ class TbTdcGpx2Phy:
     def frame_driver(self, ch, values, lengths):
         for l, v in zip(lengths, values):
             yield self.channel_csr[ch].frame_length.write(l)
-            yield self.transfer_frame(ch, int_to_bits(v, l), 500, 500)
-
-
-@cocotb.test()
-def csr_test(dut):
-    tb = TbTdcGpx2Phy(dut, 100, 125)
-    yield tb.initialize()
-
-    regs = ["frame_length", "frame_delay_value", "data_delay_value"]
-    for r, ch in product(regs, range(4)):
-        print(r, ch)
-        v = randint(0, 31)
-        reg = getattr(tb.channel_csr[ch], r)
-        yield reg.write(v)
-        readout = yield reg.read()
-        readout = readout.value.integer
-        if readout != v:
-            raise TestFailure("CSR readout error at channel {}, expected 0x{:02x}, got 0x{:02x}".format(ch, v, readout))
+            yield Timer(100, "ns")
+            yield self.transfer_frame(ch, int_to_bits(v, l), 0, 0)
 
 
 @cocotb.test()
 def data_test(dut):
-
-    random.seed(123)
     tb = TbTdcGpx2Phy(dut, 100, 125)
     yield tb.initialize()
 
     lengths = [14, 20, 22, 38, 44]*5
-    # values = [randint(0, 2**l-1) for l in lengths]
-    values = [1]*len(lengths)
-    print([hex(x) for x in values])
-
+    values = [randint(0, 2**l-1) for l in lengths]
+    
     monitors = [Join(cocotb.fork(tb.data_out_monitor(ch, values, lengths))) for ch in range(4)]
     drivers = [Join(cocotb.fork(tb.frame_driver(ch, values, lengths))) for ch in range(4)]
 
