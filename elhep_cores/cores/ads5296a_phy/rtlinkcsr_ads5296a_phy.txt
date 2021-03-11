@@ -1,0 +1,11 @@
+Address, Name, Length
+0, data0_delay_value, 5
+1, data1_delay_value, 5
+2, data2_delay_value, 5
+3, data3_delay_value, 5
+4, data4_delay_value, 5
+5, data5_delay_value, 5
+6, data6_delay_value, 5
+7, data7_delay_value, 5
+8, data8_delay_value, 5
+9, adclk_delay_value, 5

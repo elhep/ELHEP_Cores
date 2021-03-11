@@ -1,0 +1,5 @@
+**.vcd
+results.xml
+build/**
+sim_build/**
+tdc_gpx2.v

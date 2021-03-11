@@ -1,0 +1,4 @@
+tests/ADS5296A_XS7.v
+tests/build/**
+tests/sim_build/**
+tests/transcript
