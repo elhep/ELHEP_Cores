@@ -7,7 +7,10 @@ WAVES=1
 
 SIM_ARGS=-voptargs=\"-L unisims_ver -L unimacro_ver -L secureip\" work.glbl
 
+ELHEP_CORES=$(PWD)/../../../..
 DARTIQ_IMAGE=dartiq
+
+export PYTHONPATH := $(PYTHONPATH):$(ELHEP_CORES)
 
 include $(shell cocotb-config --makefiles)/Makefile.sim
 

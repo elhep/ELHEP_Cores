@@ -5,9 +5,6 @@ COMPILE_ARGS=-y$(XILINX_VIVADO)/data/verilog/src/unisims -s glbl
 
 ELHEP_CORES=$(PWD)/../../../..
 DARTIQ_IMAGE=dartiq
-# PYTHONPATH := $(ELHEP_CORES):$(PYTHONPATH)
-PYTHONPATH = "dupa123"
-export 
 
 include $(shell cocotb-config --makefiles)/Makefile.sim
 

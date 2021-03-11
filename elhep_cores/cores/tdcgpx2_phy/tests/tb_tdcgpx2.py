@@ -1,12 +1,13 @@
 import random
-import cocotb
+from itertools import product
+from random import randint
 
+import cocotb
 from cocotb.triggers import Timer, RisingEdge, FallingEdge, Combine, Join
 from cocotb.clock import Clock
 from cocotb.result import TestFailure
-from gateware.simulation.cocotb_rtlink import RtLinkCSR
-from itertools import product
-from random import randint
+
+from elhep_cores.simulation.cocotb_rtlink import RtLinkCSR
 
 
 def int_to_bits(i, length):
@@ -27,7 +28,7 @@ class TbTdcGpx2Phy:
         self.fe = FallingEdge(dut.dclk_p)
 
         self.channel_csr = [
-            RtLinkCSR(definition_file_path="rtlinkcsr_tdc_gpx_channel_phy.txt",
+            RtLinkCSR(definition_file_path="sim_build/rtlinkcsr_tdc_gpx_channel_phy.txt",
                       rio_phy_clock=self.dut.rio_phy_clk,
                       stb_i=getattr(self.dut, "rtlink{}_stb_i".format(i)),
                       data_i=getattr(self.dut, "rtlink{}_data_i".format(i)),
@@ -114,7 +115,7 @@ class TbTdcGpx2Phy:
     def frame_driver(self, ch, values, lengths):
         for l, v in zip(lengths, values):
             yield self.channel_csr[ch].frame_length.write(l)
-            yield self.transfer_frame(ch, int_to_bits(v, l), 0, 0)
+            yield self.transfer_frame(ch, int_to_bits(v, l), 500, 500)
 
 
 @cocotb.test()
@@ -136,11 +137,15 @@ def csr_test(dut):
 
 @cocotb.test()
 def data_test(dut):
+
+    random.seed(123)
     tb = TbTdcGpx2Phy(dut, 100, 125)
     yield tb.initialize()
 
-    lengths = [14, 20, 38, 44]*5
-    values = [randint(0, 2**l-1) for l in lengths]
+    lengths = [14, 20, 22, 38, 44]*5
+    # values = [randint(0, 2**l-1) for l in lengths]
+    values = [1]*len(lengths)
+    print([hex(x) for x in values])
 
     monitors = [Join(cocotb.fork(tb.data_out_monitor(ch, values, lengths))) for ch in range(4)]
     drivers = [Join(cocotb.fork(tb.frame_driver(ch, values, lengths))) for ch in range(4)]

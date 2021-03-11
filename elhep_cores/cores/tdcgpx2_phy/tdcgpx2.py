@@ -1,11 +1,12 @@
 from migen.build.xilinx.platform import XilinxPlatform
 from migen.build.generic_platform import *
 from migen.genlib.io import DifferentialInput
-from gateware.cores.xilinx import *
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from artiq.gateware import rtio
-from gateware.cores.rtlink_csr import RtLinkCSR
+
+from elhep_cores.cores.rtlink_csr import RtLinkCSR
+from elhep_cores.cores.xilinx import *
 
 
 class TdcGpx2Phy(Module):
@@ -198,7 +199,7 @@ if __name__ == "__main__":
 
     # Generate simulation source for Cocotb
     from migen.build.xilinx import common
-    from gateware.simulation.common import update_tb
+    from elhep_cores.simulation.common import update_tb
 
     module = SimulationWrapper()
     so = dict(common.xilinx_special_overrides)
@@ -208,5 +209,5 @@ if __name__ == "__main__":
                     name="top",
                     special_overrides=so,
                     ios={*module.io},
-                    create_clock_domains=False).write('tdc_gpx2.v')
-    update_tb('tdc_gpx2.v')
+                    create_clock_domains=False).write('dut.v')
+    update_tb('dut.v')
