@@ -1,46 +1,21 @@
-from artiq.gateware.fmc import _FMC, _fmc_pin
 from migen.build.generic_platform import *
+
+from misoc.cores import gpio
 
 from artiq.gateware.rtio.phy.ttl_simple import *
 from artiq.gateware.rtio.phy import ttl_serdes_7series
 from artiq.gateware.rtio.phy.spi2 import SPIMaster
 from artiq.gateware.rtio.phy.edge_counter import SimpleEdgeCounter
-
-from misoc.cores import gpio
 from artiq.gateware import rtio
 
-from gateware.cores.phy.ads5296a.ads5296a import ADS5296A_XS7
-from gateware.cores.phy.tdcgpx2.tdcgpx2 import TdcGpx2Phy
+from elhep_cores.cores.ads5296a_phy.ads5296a import ADS5296A_XS7
+from elhep_cores.cores.tdcgpx2_phy.tdcgpx2 import TdcGpx2Phy
 
-from gateware.cores.daq.adc_daq.adc_phy_daq import AdcPhyDaq
-from gateware.cores.daq.tdc_daq.tdcdaq import TdcDaq
-
-from gateware.cores.xilinx import *
-
-
-class TristateDs(Module):
-
-    def __init__(self, i, o, oe, pads):
-        self.specials += Instance("IOBUFDS", i_T=oe, i_I=i, o_O=o, io_IO=pads.p, io_IOB=pads.n)
+from elhep_cores.cores.xilinx import *
+from elhep_cores.helpers.fmc import _FMC, _fmc_pin
 
 
 class FmcAdc100M10b16chaTdc(_FMC):
-
-    @classmethod
-    def signal_name(cls, signal_name, fmc):
-        return "fmc{}_{}".format(fmc, signal_name)
-
-    @classmethod
-    def diff_signal(cls, signal_name, fmc, bank, i, iostd_diff, idx=0):
-        return (cls.signal_name(signal_name, fmc), idx,
-                Subsignal("p", Pins(_fmc_pin(fmc, bank, i, "p"))),
-                Subsignal("n", Pins(_fmc_pin(fmc, bank, i, "n"))),
-                *(iostd_diff[f"fmc{fmc}_{bank}"]))
-
-    @classmethod
-    def single_signal(cls, signal_name, fmc, bank, i, pol, iostd_single, idx=0):
-        return (cls.signal_name(signal_name, fmc), idx, Pins(_fmc_pin(fmc, bank, i, pol)),
-                *(iostd_single[f"fmc{fmc}_{bank}"]))
 
     @classmethod
     def io(cls, fmc, iostd_single, iostd_diff):
@@ -164,8 +139,12 @@ class FmcAdc100M10b16chaTdc(_FMC):
     def add_std(cls, target, fmc, iostd_single, iostd_diff, with_trig=False, adc_daq_samples=1024, tdc_daq_samples=1024):
         cls.add_extension(target, fmc, iostd_single, iostd_diff)
 
+        # CFD DAC I2C
+
         dac_i2c = target.platform.request(cls.signal_name("dac_i2c", fmc))
         target.add_i2c_bus(dac_i2c.scl, dac_i2c.sda, f"FMC{fmc} DAC I2C")
+
+        # IOs
 
         for i in range(4):
             pads = target.platform.request(cls.signal_name("tdc_dis", fmc), i)
@@ -182,14 +161,15 @@ class FmcAdc100M10b16chaTdc(_FMC):
             target.submodules += phy
             target.add_rtio_channels(rtio.Channel.from_phy(phy), "fmc{}_{} (Output)".format(fmc, sn))
 
+        # SPI Configuration interfaces
+
         tdc_spi = target.platform.request(cls.signal_name("tdc_spi", fmc), 0)
         tdc_spi_pads = Signal()
         tdc_spi_pads.clk = tdc_spi.sck
         tdc_spi_pads.miso = tdc_spi.miso
         tdc_spi_pads.mosi = tdc_spi.mosi
         tdc_spi_pads.cs_n = Signal(5)
-        # tdc_spi_pads.cs_n = Cat(*[target.platform.request(cls.signal_name("tdc_spi_csn", fmc), i) for i in range(5)])
-
+        
         phy = SPIMaster(tdc_spi_pads)
         target.submodules += phy
         target.add_rtio_channels(rtio.Channel.from_phy(phy), "fmc{}_tdc_spi (SPIMaster)".format(fmc))
@@ -199,17 +179,25 @@ class FmcAdc100M10b16chaTdc(_FMC):
         adc_spi_pads.clk = adc_spi.sck
         adc_spi_pads.miso = adc_spi.miso
         adc_spi_pads.mosi = adc_spi.mosi
-        adc_spi_pads.cs_n = Signal(2)
-        # adc_spi_pads.cs_n = Cat(*[target.platform.request(cls.signal_name("adc_spi_csn", fmc), i) for i in range(2)])
+        adc_spi_pads.cs_n = Signal(2)        
 
         phy = SPIMaster(adc_spi_pads)
         target.submodules += phy
         target.add_rtio_channels(rtio.Channel.from_phy(phy), "fmc{}_adc_spi (SPIMaster)".format(fmc))
 
+        csn_pads = [
+            *[target.platform.request(cls.signal_name("tdc_spi_csn", fmc), i) for i in range(5)],
+            *[target.platform.request(cls.signal_name("adc_spi_csn", fmc), i) for i in range(2)]
+        ]
+
+        for i, pad in enumerate(csn_pads):
+            phy = Output(pad)
+            target.submodules += phy
+            target.add_rtio_channels(rtio.Channel.from_phy(phy), "fmc{}_csn{} (Output)".format(fmc, i))
+
         # ADC
 
         for adc_id in range(2):
-            # There is single PHY per ADS5296A chip, but each channel has its own DAQ module
             dclk_name = "fmc{}_adc{}_dclk".format(fmc, adc_id)
             adc_lclk = target.platform.request(cls.signal_name("adc_out_lclk", fmc), adc_id)
             phy = ADS5296A_XS7(
@@ -227,16 +215,6 @@ class FmcAdc100M10b16chaTdc(_FMC):
                 "fmc{}_adc{} (ADS5296APhy)".format(fmc, adc_id)
             )
 
-            for channel in range(9):
-                daq = ClockDomainsRenamer({"dclk": dclk_name})(AdcPhyDaq(
-                    data_clk=phy.data_clk_o,
-                    data=phy.data_o[channel],
-                    max_samples=adc_daq_samples))
-                setattr(target.submodules, "fmc{}_adc{}_daq{}".format(fmc, adc_id, channel), daq)
-                target.add_rtio_channels(
-                    rtio.Channel.from_phy(daq, ififo_depth=adc_daq_samples),
-                    "fmc{}_adc{}_daq{} (AdcPhyDaq)".format(fmc, adc_id, channel))
-
         # TDC
 
         for tdc_id in range(4):
@@ -252,26 +230,6 @@ class FmcAdc100M10b16chaTdc(_FMC):
             target.add_rtio_channels(
                 phy.rtio_channels,
                 ["fmc{}_tdc{}_phy_ch{} (TdcGpx2PhyChannel)".format(fmc, tdc_id, ch) for ch in range(4)])
-
-            for channel in range(4):
-                daq = TdcDaq(data_i=phy.data_o[channel],
-                             stb_i=phy.data_stb_o[channel],
-                             channel_depth=tdc_daq_samples)
-                daq_renamed = ClockDomainsRenamer({"dclk": dclk_name})(daq)
-                setattr(target.submodules, "fmc{}_tdc{}_daq{}".format(fmc, tdc_id, channel), daq_renamed)
-                target.add_rtio_channels(daq.rtlink_channels,
-                                         ["fmc{}_tdc{}_daq{}_msb (TdcDaq)".format(fmc, tdc_id, channel),
-                                          "fmc{}_tdc{}_daq{}_lsb (TdcDaq)".format(fmc, tdc_id, channel)])
-
-        csn_pads = [
-            *[target.platform.request(cls.signal_name("tdc_spi_csn", fmc), i) for i in range(5)],
-            *[target.platform.request(cls.signal_name("adc_spi_csn", fmc), i) for i in range(2)]
-        ]
-
-        for i, pad in enumerate(csn_pads):
-            phy = Output(pad)
-            target.submodules += phy
-            target.add_rtio_channels(rtio.Channel.from_phy(phy), "fmc{}_csn{} (Output)".format(fmc, i))
 
         if with_trig:
             pads = target.platform.request(cls.signal_name("trig", fmc))
@@ -318,6 +276,3 @@ class FmcAdc100M10b16chaTdc(_FMC):
                 f"fmc{fmc}_adc{adc_id}_lclk_ttl_input",
                 f"fmc{fmc}_adc{adc_id}_lclk_edge_counter",
             ])
-
-    
-

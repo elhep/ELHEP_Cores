@@ -29,7 +29,7 @@ class CircularDAQ(Module):
     """
 
     def __init__(self, data_i, stb_i, trigger_rio_phy, 
-        circular_buffer_length=128, channel_depth=128, trigger_cnt_len=4):
+        circular_buffer_length=128, trigger_cnt_len=4):
 
         data_width = len(data_i)
         assert data_width <= 32-trigger_cnt_len
@@ -44,7 +44,6 @@ class CircularDAQ(Module):
         self.rtlink = rtlink_iface = rtlink.Interface(
             rtlink.OInterface(data_width=len(pretrigger_rio_phy), address_width=2),
             rtlink.IInterface(data_width=data_width+trigger_cnt_len, timestamped=True))
-        self.rtlink_channels = [Channel(rtlink_iface, ififo_depth=channel_depth)]
 
         self.sync.rio_phy += [
             If(rtlink_iface.o.stb,
