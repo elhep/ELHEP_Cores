@@ -15,6 +15,7 @@ class RtLinkCSR(Module):
     def __init__(self, regs, name, output_dir=None):
         self.output_dir = output_dir if output_dir is not None else "./"
         self.name = name
+        self.regs = regs
 
         data_width = max([x[1] for x in regs])
 

@@ -5,6 +5,7 @@ from artiq.gateware.rtio import rtlink
 from elhep_cores.cores.dsp.baseline import SignalBaseline
 from functools import reduce
 from operator import and_, add
+from elhep_cores.cores.rtlink_csr import RtLinkCSR
 
 
 def divide_chunks(l, n): 
@@ -119,12 +120,21 @@ class RtioBaselineTriggerGenerator(BaselineTriggerGenerator):
 
         # # #
 
+        regs = [
+             ("offset_level", len(data))
+        ]
+        csr = RtLinkCSR(regs, "baseline_trigger_generator")
+        self.submodules.csr = csr
+
         trigger_level_sys = Signal.like(data)
         
         cdc = BusSynchronizer(len(data), "rio_phy", "sys")
         self.submodules += cdc
 
         self.sync.rio_phy += If(self.rtlink.o.stb, cdc.i.eq(self.rtlink.o.data))
-        self.comb += trigger_level_sys.eq(cdc.o)
-
+        self.comb += [
+            cdc.i.eq(self.csr.offset_level),
+            trigger_level_sys.eq(cdc.o)
+        ]
+            
         super().__init__(data, trigger_level_sys, treshold_length, name)

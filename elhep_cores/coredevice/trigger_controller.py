@@ -1,0 +1,2 @@
+class TriggerController:
+    pass

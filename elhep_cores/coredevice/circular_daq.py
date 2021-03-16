@@ -1,0 +1,3 @@
+class CircularDaq:
+
+    pass

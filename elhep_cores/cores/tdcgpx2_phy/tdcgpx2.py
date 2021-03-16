@@ -32,7 +32,7 @@ class TdcGpx2Phy(Module):
 
         self.specials += [AsyncResetSynchronizer(cd_dclk, ResetSignal("sys"))]
 
-        self.rtio_channels = []
+        self.phy_channels = []
         for channel, (frame, data) in enumerate(zip(frame_signals_i, data_signals_i)):
             frame_se = Signal()
             data_se = Signal()
@@ -40,10 +40,10 @@ class TdcGpx2Phy(Module):
             self.specials += DifferentialInput(data.p, data.n, data_se)
 
             channel_phy = ClockDomainsRenamer("dclk")(TdcGpx2ChannelPhy(frame_i=frame_se, data_i=data_se))
+            self.phy_channels.append(channel_phy)
             setattr(self.submodules, "channel{}".format(channel), channel_phy)
             self.data_o.append(channel_phy.data_o)
             self.data_stb_o.append(channel_phy.stb_o)
-            self.rtio_channels.append(rtio.Channel.from_phy(channel_phy.csr))
 
 
 class TdcGpx2ChannelPhy(Module):

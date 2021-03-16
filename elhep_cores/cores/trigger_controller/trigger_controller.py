@@ -85,7 +85,7 @@ class RtioTriggerController(Module):
                     "channels": trigger_channels, 
                     "sw_trigger_start": len(trigger_generator_signals), 
                     "sw_trigger_num": rtlink_triggers_no
-                }, fp=fp)
+                }, fp=fp, indent=4)
 
         matrix_row_width = len(trigger_generator_signals)
         address_width = len(Signal(max=len(trigger_channel_signals)*adr_per_channel))

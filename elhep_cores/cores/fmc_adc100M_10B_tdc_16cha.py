@@ -142,15 +142,25 @@ class FmcAdc100M10b16chaTdc(_FMC):
         # CFD DAC I2C
 
         dac_i2c = target.platform.request(cls.signal_name("dac_i2c", fmc))
-        target.add_i2c_bus(dac_i2c.scl, dac_i2c.sda, f"FMC{fmc} DAC I2C")
-
+        bus_id = target.add_i2c_bus(dac_i2c.scl, dac_i2c.sda, f"FMC{fmc} DAC I2C")
+        
+        for i, address in enumerate([0x48, 0x49]):
+            target.register_coredevice(
+                device_id=f"fmc{fmc}_cfd_offset_dac{i}",
+                module="elhep_cores.coredevice.dac7578", class_name="DAC7578",
+                arguments={"bus": bus_id, "address": address})
+        
         # IOs
 
         for i in range(4):
             pads = target.platform.request(cls.signal_name("tdc_dis", fmc), i)
             phy = Output(pads.p, pads.n)
             target.submodules += phy
-            target.add_rtio_channels(rtio.Channel.from_phy(phy), "fmc{}_tdc_dis{} (Output)".format(fmc, i))
+            target.add_rtio_channels(
+                channel=rtio.Channel.from_phy(phy), 
+                device_id=f"fmc{fmc}_tdc_dis{i}",
+                module="artiq.coredevice.ttl",
+                class_name="TTLOut")
 
         for sn in ["idx_in", "adc_resetn", "adc_sync", "trig_term", "trig_dir", "ref_sel", "idx_src_sel"]:
             pads = target.platform.request(cls.signal_name(sn, fmc), 0)
@@ -159,7 +169,11 @@ class FmcAdc100M10b16chaTdc(_FMC):
             else:
                 phy = Output(pads)
             target.submodules += phy
-            target.add_rtio_channels(rtio.Channel.from_phy(phy), "fmc{}_{} (Output)".format(fmc, sn))
+            target.add_rtio_channels(
+                channel=rtio.Channel.from_phy(phy), 
+                device_id=f"fmc{fmc}_{sn}",
+                module="artiq.coredevice.ttl",
+                class_name="TTLOut")
 
         # SPI Configuration interfaces
 
@@ -172,7 +186,11 @@ class FmcAdc100M10b16chaTdc(_FMC):
         
         phy = SPIMaster(tdc_spi_pads)
         target.submodules += phy
-        target.add_rtio_channels(rtio.Channel.from_phy(phy), "fmc{}_tdc_spi (SPIMaster)".format(fmc))
+        target.add_rtio_channels(
+                channel=rtio.Channel.from_phy(phy), 
+                device_id=f"fmc{fmc}_tdc_spi",
+                module="artiq.coredevice.spi2",
+                class_name="SPIMaster")
 
         adc_spi = target.platform.request(cls.signal_name("adc_spi", fmc), 0)
         adc_spi_pads = Signal()
@@ -183,7 +201,11 @@ class FmcAdc100M10b16chaTdc(_FMC):
 
         phy = SPIMaster(adc_spi_pads)
         target.submodules += phy
-        target.add_rtio_channels(rtio.Channel.from_phy(phy), "fmc{}_adc_spi (SPIMaster)".format(fmc))
+        target.add_rtio_channels(
+                channel=rtio.Channel.from_phy(phy), 
+                device_id=f"fmc{fmc}_adc_spi",
+                module="artiq.coredevice.spi2",
+                class_name="SPIMaster")
 
         csn_pads = [
             *[target.platform.request(cls.signal_name("tdc_spi_csn", fmc), i) for i in range(5)],
@@ -193,7 +215,11 @@ class FmcAdc100M10b16chaTdc(_FMC):
         for i, pad in enumerate(csn_pads):
             phy = Output(pad)
             target.submodules += phy
-            target.add_rtio_channels(rtio.Channel.from_phy(phy), "fmc{}_csn{} (Output)".format(fmc, i))
+            target.add_rtio_channels(
+                channel=rtio.Channel.from_phy(phy), 
+                device_id=f"fmc{fmc}_csn{i}",
+                module="artiq.coredevice.ttl",
+                class_name="TTLOut")
 
         # ADC
 
@@ -211,9 +237,13 @@ class FmcAdc100M10b16chaTdc(_FMC):
             phy_renamed_cd = ClockDomainsRenamer({"adclk_clkdiv": dclk_name})(phy)
             setattr(target.submodules, "fmc{}_adc{}_phy".format(fmc, adc_id), phy_renamed_cd)
             target.add_rtio_channels(
-                phy.rtio_channels[0],
-                "fmc{}_adc{} (ADS5296APhy)".format(fmc, adc_id)
-            )
+                channel=rtio.Channel.from_phy(phy.csr), 
+                device_id=f"fmc{fmc}_adc{adc_id}_phycsr",
+                module="elhep_cores.coredevice.rtlink_csr",
+                class_name="RtlinkCsr",
+                arguments={
+                    "regs": phy.csr.regs
+                })
 
         # TDC
 
@@ -227,52 +257,77 @@ class FmcAdc100M10b16chaTdc(_FMC):
             target.platform.add_period_constraint(phy.cd_dclk.clk, 4.)
             phy_renamed_cd = ClockDomainsRenamer({"dclk": dclk_name})(phy)
             setattr(target.submodules, "fmc{}_tdc{}_phy".format(fmc, tdc_id), phy_renamed_cd)
-            target.add_rtio_channels(
-                phy.rtio_channels,
-                ["fmc{}_tdc{}_phy_ch{} (TdcGpx2PhyChannel)".format(fmc, tdc_id, ch) for ch in range(4)])
+            for idx, channel in enumerate(phy.phy_channels):
+                target.add_rtio_channels(
+                    channel=rtio.Channel.from_phy(channel.csr),
+                    device_id=f"fmc{fmc}_tdc{tdc_id}_phycsr_{idx}",
+                    module="elhep_cores.coredevice.rtlink_csr",
+                    class_name="RtlinkCsr",
+                    arguments={
+                        "regs": channel.csr.regs
+                    })
 
         if with_trig:
             pads = target.platform.request(cls.signal_name("trig", fmc))
             phy = ttl_serdes_7series.InOut_8X(pads.p, pads.n)
             target.submodules += phy
-            target.add_rtio_channels(rtio.Channel.from_phy(phy, ififo_depth=64), "fmc{}_trig (InOut_8X)".format(fmc))
-
+            target.add_rtio_channels(
+                channel=rtio.Channel.from_phy(phy, ififo_depth=64), 
+                device_id=f"fmc{fmc}_trig",
+                module="artiq.coredevice.ttl",
+                class_name="TTLInOut")
+    
         # Frequency counters
 
         clk0_m2c_pads = target.platform.request(f"fmc{fmc}_clk0_m2c")
         phy_clk0_m2c = Input(clk0_m2c_pads.p, clk0_m2c_pads.n)
         clk0_m2c_edge_counter = SimpleEdgeCounter(phy_clk0_m2c.input_state)
+        target.submodules += [phy_clk0_m2c, clk0_m2c_edge_counter]
+
+        target.add_rtio_channels(
+            channel=rtio.Channel.from_phy(phy_clk0_m2c), 
+            device_id=f"fmc{fmc}_clk0_m2c_ttl_input",
+            module="artiq.coredevice.ttl",
+            class_name="TTLInOut")
+        target.add_rtio_channels(
+            channel=rtio.Channel.from_phy(clk0_m2c_edge_counter), 
+            device_id=f"fmc{fmc}_clk0_m2c_edge_counter",
+            module="artiq.coredevice.edge_counter",
+            class_name="EdgeCounter")
 
         clk1_m2c_pads = target.platform.request(f"fmc{fmc}_clk1_m2c")
         phy_clk1_m2c = Input(clk1_m2c_pads.p, clk1_m2c_pads.n)
         clk1_m2c_edge_counter = SimpleEdgeCounter(phy_clk1_m2c.input_state)
+        target.submodules += [phy_clk1_m2c, clk1_m2c_edge_counter]
 
-        target.submodules += [phy_clk0_m2c, clk0_m2c_edge_counter, phy_clk1_m2c, clk1_m2c_edge_counter]
-
-        target.add_rtio_channels([
-            rtio.Channel.from_phy(phy_clk0_m2c),
-            rtio.Channel.from_phy(clk0_m2c_edge_counter),
-            rtio.Channel.from_phy(phy_clk1_m2c),
-            rtio.Channel.from_phy(clk1_m2c_edge_counter)
-        ], [
-            f"fmc{fmc}_clk0_m2c_ttl_input",
-            f"fmc{fmc}_clk0_m2c_edge_counter",
-            f"fmc{fmc}_clk1_m2c_ttl_input",
-            f"fmc{fmc}_clk1_m2c_edge_counter"
-        ])
+        target.add_rtio_channels(
+            channel=rtio.Channel.from_phy(phy_clk1_m2c), 
+            device_id=f"fmc{fmc}_clk1_m2c_ttl_input",
+            module="artiq.coredevice.ttl",
+            class_name="TTLInOut")
+        target.add_rtio_channels(
+            channel=rtio.Channel.from_phy(clk1_m2c_edge_counter), 
+            device_id=f"fmc{fmc}_clk1_m2c_edge_counter",
+            module="artiq.coredevice.edge_counter",
+            class_name="EdgeCounter")
 
         # Debug counters
 
         for adc_id in range(2):
-            adc_phy = getattr(target, "fmc{}_adc{}_phy".format(fmc, adc_id))
+            adc_phy = getattr(target, f"fmc{fmc}_adc{adc_id}_phy")
             phy_adc_lclk = Input(adc_phy.lclk)
             phy_adc_lclk_counter = SimpleEdgeCounter(phy_adc_lclk.input_state)
-
             target.submodules += [phy_adc_lclk, phy_adc_lclk_counter]
-            target.add_rtio_channels([
-                rtio.Channel.from_phy(phy_adc_lclk),
-                rtio.Channel.from_phy(phy_adc_lclk_counter),
-            ],[
-                f"fmc{fmc}_adc{adc_id}_lclk_ttl_input",
-                f"fmc{fmc}_adc{adc_id}_lclk_edge_counter",
-            ])
+
+            target.add_rtio_channels(
+                channel=rtio.Channel.from_phy(phy_adc_lclk), 
+                device_id=f"fmc{fmc}_phy_adc{adc_id}_lclk_input",
+                module="artiq.coredevice.ttl",
+                class_name="TTLInOut")
+            target.add_rtio_channels(
+                channel=rtio.Channel.from_phy(phy_adc_lclk_counter), 
+                device_id=f"fmc{fmc}_phy_adc{adc_id}_lclk_counter",
+                module="artiq.coredevice.edge_counter",
+                class_name="EdgeCounter")
+            
+             

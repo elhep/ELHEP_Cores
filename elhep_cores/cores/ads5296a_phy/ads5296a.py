@@ -48,8 +48,7 @@ class ADS5296A_XS7(Module):
 
         csr = RtLinkCSR(regs, "ads5296a_phy")
         self.submodules.csr = csr
-        self.rtio_channels = [rtio.Channel.from_phy(self.csr)]
-
+        
         # Design
         # ==========================================
 
