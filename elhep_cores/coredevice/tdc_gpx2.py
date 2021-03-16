@@ -43,94 +43,18 @@ HIGH_RESOLUTION_4x = 0b10 << 6
 
 # Register 2
 
-
-class TdcGpx2ChannelPhy:
-    pass
-
-
-
-class TDCGPX2ChannelDAQ:
-
-    def __init__(self, dmgr, channel, data_width=44, core_device="core"):
-        self.channel = channel
-        self.core = dmgr.get(core_device)
-        self.ref_period_mu = self.core.seconds_to_mu(
-            self.core.coarse_ref_period)
-        self.data_width = data_width
-        self.samples_msb = []
-        self.samples_lsb = []
-        self.samples = []
-
-    @kernel
-    def open_gate(self):
-        rtio_output((self.channel << 8), 1)
-        # delay_mu(self.ref_period_mu)  # FIXME: Do we need that?
-
-    @kernel
-    def close_gate(self):
-        rtio_output((self.channel << 8), 0)
-        # delay_mu(self.ref_period_mu)  # FIXME: Do we need that?
-
-    @rpc(flags={"async"})
-    def _store_sample(self, sample, msb):
-        if msb:
-            self.samples_msb.append(sample)
-        else:
-            self.samples_lsb.append(sample)
-
-    @kernel
-    def _transfer_from_rtio(self, msb) -> TInt32:
-        i = 0
-        ch = self.channel if msb else self.channel+1
-        while True:
-            ts, data = rtio_input_timestamped_data(10*ns, ch)
-            if ts < 0:
-                break
-            else:
-                self._store_sample([ts, data], msb)
-                i += 1
-        return i
-
-    def get_samples(self):
-        self._transfer_from_rtio(msb=True)
-        if self.data_width > 32:
-            self._transfer_from_rtio(msb=False)
-            for lsb, msb in zip(self.samples_lsb, self.samples_msb):
-                self.samples.append([msb[0], (msb[1] << 32) | (lsb[1])])
-        else:
-            self.samples = self.samples_msb
-
-
 class TDCGPX2:
 
-    def __init__(self, dmgr, channel, spi_device, chip_select, spi_freq=25_000_000, data_width=44, core_device="core"):
-        self.channel = channel
+    def __init__(self, dmgr, phy_csr_prefix, spi_device, chip_select, spi_freq=25_000_000, data_width=44, core_device="core"):
         self.core = dmgr.get(core_device)
         self.ref_period_mu = self.core.seconds_to_mu(
             self.core.coarse_ref_period)
 
-        if isinstance(spi_device, str):
-            self.spi = dmgr.get(spi_device)
-        else:
-            self.spi = spi_device  # type: spi.SPIMaster
-
-        if isinstance(chip_select, TTLOut):
-            self.chip_select = 0
-            self.csn_device = chip_select
-        else:
-            self.chip_select = chip_select
-            self.csn_device = None
-
+        self.spi = dmgr.get(spi_device)
+        self.chip_select = 0
+        self.csn_device = dmgr.get(chip_select)
         self.div = self.spi.frequency_to_div(spi_freq)
-
-        phy_config = [
-            [0, "frame_length", 6],
-            [1, "frame_delay_value", 5],
-            [2, "data_delay_value", 5]
-        ]
-
-        self.phy = [RtlinkCsr(dmgr, channel+i, config=phy_config, core_device=core_device) for i in range(4)]
-        self.daq = [TDCGPX2ChannelDAQ(dmgr, channel+4+2*i, data_width, core_device) for i in range(4)]
+        self.phy = [dmgr.get(f"{phy_csr_prefix}{i}") for i in range(4)]
 
         self.readout = [0] * 24
 

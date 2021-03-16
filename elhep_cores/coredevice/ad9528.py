@@ -6,6 +6,8 @@ from artiq.language.core import kernel
 from artiq.language.units import *
 from numpy import int32
 
+from elhep_cores.coredevice.ad9528_default_config import AD9528_DEFAULT_CONFIG
+
 
 SPI_CONFIG = (0*spi.SPI_OFFLINE | 0*spi.SPI_END |
               0*spi.SPI_INPUT | 0*spi.SPI_CS_POLARITY |
@@ -15,30 +17,21 @@ SPI_CONFIG = (0*spi.SPI_OFFLINE | 0*spi.SPI_END |
 
 class AD9528:
 
-    def __init__(self, dmgr, spi_device, chip_select, reset_device=None, spi_freq=10_000_000, config=None,
+    def __init__(self, dmgr, spi_device, chip_select, spi_freq=10_000_000, config=None,
                  core_device="core"):
         self.core = dmgr.get(core_device)
         self.ref_period_mu = self.core.seconds_to_mu(
             self.core.coarse_ref_period)
 
-        self.reset_device = reset_device
-
-        if isinstance(spi_device, str):
-            self.spi = dmgr.get(spi_device)
-        else:
-            self.spi = spi_device  # type: spi.SPIMaster
-
-        if isinstance(chip_select, TTLOut):
-            self.chip_select = 0
-            self.csn_device = chip_select
-        else:
-            self.chip_select = chip_select
-            self.csn_device = None
-
+        self.spi = dmgr.get(spi_device)
+        self.chip_select = 0
+        self.csn_device = dmgr.get(chip_select)
         self.div = self.spi.frequency_to_div(spi_freq)
 
         self.regs = []
-        if config:
+        # TODO: Make config understand python module path
+        if config is None:
+            config = AD9528_DEFAULT_CONFIG
             self._parse_config_string(config)
 
         self.config_readout = [0]*len(self.regs)

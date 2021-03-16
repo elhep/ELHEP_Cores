@@ -27,13 +27,13 @@ class ILAProbe(Module):
             signal.name_override = name
 
 
-def add_xilinx_ila(target, depth=1024):
+def add_xilinx_ila(target, debug_clock, depth=1024):
     tools.write_to_file("insert_ila.tcl", insert_ila_script())
     target.platform.toolchain.postsynthesis_commands.append("source insert_ila.tcl")
     target.platform.toolchain.postsynthesis_commands.append(
         f"batch_insert_ila {{{depth}}}")
-    target.cd_sys.clk.attr.add(("mark_dbg_hub_clk", "true"))
-    target.cd_sys.clk.attr.add(("keep", "true"))
+    debug_clock.attr.add(("mark_dbg_hub_clk", "true"))
+    debug_clock.attr.add(("keep", "true"))
     target.platform.toolchain.postsynthesis_commands.append(
         "connect_debug_port dbg_hub/clk [get_nets -hierarchical -filter {mark_dbg_hub_clk == true}]")
 

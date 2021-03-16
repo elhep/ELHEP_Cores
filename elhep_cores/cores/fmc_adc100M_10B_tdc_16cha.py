@@ -221,6 +221,19 @@ class FmcAdc100M10b16chaTdc(_FMC):
                 module="artiq.coredevice.ttl",
                 class_name="TTLOut")
 
+        # Clocking
+
+        target.register_coredevice(
+            device_id=f"fmc{fmc}_clock_dist",
+            module="elhep_cores.coredevice.ad9528",
+            class_name="AD9528",
+            arguments={
+                "spi_device": f"fmc{fmc}_tdc_spi",
+                "phy_csr_prefix": f"fmc{fmc}_clock_dist",
+                "chip_select": f"fmc{fmc}_csn4"
+            }
+        )
+
         # ADC
 
         for adc_id in range(2):
@@ -245,6 +258,18 @@ class FmcAdc100M10b16chaTdc(_FMC):
                     "regs": phy.csr.regs
                 })
 
+            target.register_coredevice(
+                device_id=f"fmc{fmc}_adc{adc_id}_control",
+                module="elhep_cores.coredevice.ads5296a",
+                class_name="ADS5296A",
+                arguments={
+                    "spi_device": f"fmc{fmc}_adc_spi",
+                    "phy_csr": f"fmc{fmc}_adc{adc_id}_phycsr",
+                    "chip_select": f"fmc{fmc}_csn{adc_id+5}",
+                    "spi_freq": 500_000
+                }
+            )
+
         # TDC
 
         for tdc_id in range(4):
@@ -266,6 +291,19 @@ class FmcAdc100M10b16chaTdc(_FMC):
                     arguments={
                         "regs": channel.csr.regs
                     })
+
+            target.register_coredevice(
+                device_id=f"fmc{fmc}_tdc{tdc_id}_control",
+                module="elhep_cores.coredevice.tdc_gpx2",
+                class_name="TDCGPX2",
+                arguments={
+                    "spi_device": f"fmc{fmc}_tdc_spi",
+                    "phy_csr_prefix": f"fmc{fmc}_tdc{tdc_id}_phycsr_",
+                    "chip_select": f"fmc{fmc}_csn{tdc_id+0}",
+                    "spi_freq": 1_000_000
+                }
+            )
+
 
         if with_trig:
             pads = target.platform.request(cls.signal_name("trig", fmc))
@@ -329,5 +367,16 @@ class FmcAdc100M10b16chaTdc(_FMC):
                 device_id=f"fmc{fmc}_phy_adc{adc_id}_lclk_counter",
                 module="artiq.coredevice.edge_counter",
                 class_name="EdgeCounter")
+
+        # Register itself
+
+        target.register_coredevice(
+                device_id=f"fmc{fmc}",
+                module="elhep_cores.coredevice.fmc_adc100M_10B_tdc_16cha",
+                class_name="FmcAdc100M10bTdc16cha",
+                arguments={
+                    "prefix": "fmc1"
+                })
+
             
              

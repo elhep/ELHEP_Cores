@@ -36,8 +36,8 @@ class CircularDAQ(Module):
 
         pretrigger_rio_phy = Signal(max=circular_buffer_length)
         posttrigger_rio_phy = Signal.like(pretrigger_rio_phy)
-        pretrigger_dclk = Signal.like(pretrigger_rio_phy)
-        posttrigger_dclk = Signal.like(posttrigger_rio_phy)
+        self.pretrigger_dclk = pretrigger_dclk = Signal.like(pretrigger_rio_phy)
+        self.posttrigger_dclk = posttrigger_dclk = Signal.like(posttrigger_rio_phy)
         self.trigger_dclk = trigger_dclk = Signal()
 
         # Interface - rtlink

@@ -6,6 +6,7 @@ from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from elhep_cores.cores.xilinx import XilinxIdelayE2
 from elhep_cores.cores.rtlink_csr import RtLinkCSR
+from elhep_cores.cores.xilinx_ila import ILAProbe
 
 from artiq.gateware import rtio
 
@@ -20,7 +21,6 @@ class ADS5296A_XS7(Module):
             lclk_i (differential signal): bit clock
             dat_i (array of differential signals): data lines
         """
-
 
         # Module constants
         # ==========================================
@@ -162,13 +162,12 @@ class ADS5296A_XS7(Module):
                                       i_DYNCLKSEL=0)
 
         # Debugging definition
-        # self.bitslip_done.attr.add(("mark_debug", "true"))
-        # bitslip_cnt.attr.add(("mark_debug", "true"))
-        # bitslip.attr.add(("mark_debug", "true"))
-        # self.data_o[0].attr.add(("mark_debug", "true"))
-        # csr.data0_delay_value.attr.add(("mark_debug", "true"))
-        # self.data_o[8].attr.add(("mark_debug", "true"))
-        # csr.adclk_delay_value.attr.add(("mark_debug", "true"))
+
+        self.submodules += [
+            ILAProbe(self.bitslip_done, "bitslip_done"),
+            ILAProbe(self.data_o[0], "data_0"),
+            ILAProbe(self.data_o[8], "data_8"),
+        ]
 
 
 class SimulationWrapper(Module):

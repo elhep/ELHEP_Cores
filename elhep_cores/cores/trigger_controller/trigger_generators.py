@@ -74,9 +74,10 @@ class BaselineTriggerGenerator(TriggerGenerator):
         # # #
 
         assert len(data) == len(trigger_level), "Trigger level width must be equal to data width"
-
+        
+        self.trigger_level = trigger_level
         self.submodules.baseline_generator = baseline_gen = SignalBaseline(len(data))
-        trigger_level_offset = Signal.like(data)
+        self.trigger_level_offset = trigger_level_offset = Signal.like(data)
         self.comb += [
             baseline_gen.i.eq(data),
             trigger_level_offset.eq(baseline_gen.o)
@@ -131,7 +132,6 @@ class RtioBaselineTriggerGenerator(BaselineTriggerGenerator):
         cdc = BusSynchronizer(len(data), "rio_phy", "sys")
         self.submodules += cdc
 
-        self.sync.rio_phy += If(self.rtlink.o.stb, cdc.i.eq(self.rtlink.o.data))
         self.comb += [
             cdc.i.eq(self.csr.offset_level),
             trigger_level_sys.eq(cdc.o)

@@ -7,6 +7,7 @@ from artiq.gateware import rtio
 
 from elhep_cores.cores.rtlink_csr import RtLinkCSR
 from elhep_cores.cores.xilinx import *
+from elhep_cores.cores.xilinx_ila import ILAProbe
 
 
 class TdcGpx2Phy(Module):
@@ -139,14 +140,7 @@ class TdcGpx2ChannelPhy(Module):
             shift_register_view.eq(shift_register[1:-1])
         ]
 
-        csr.frame_length.attr.add(("mark_debug", "true"))
-        bit_counter.attr.add(("mark_debug", "true"))
-        shift_register.attr.add(("mark_debug", "true"))
-        frame_start.attr.add(("mark_debug", "true"))
-        self.data_o.attr.add(("mark_debug", "true"))
-        self.stb_o.attr.add(("mark_debug", "true"))
-
-
+       
 class SimulationWrapper(Module):
 
     def __init__(self):
