@@ -46,6 +46,7 @@ class RtioTriggerController(Module):
                 ]
                 trigger_generator_signals.append(trigger_rio_phy)
                 trigger_generator_labels.append(trigger['label'])
+        
 
         rtlink_trigger_generator_signals = [Signal() for _ in range(rtlink_triggers_no)]
         rtlink_trigger_array = Array(rtlink_trigger_generator_signals)
@@ -60,6 +61,10 @@ class RtioTriggerController(Module):
 
         trigger_rtlink_layout = {}
         trigger_channels = {}
+
+        
+        matrix_row_width = len(trigger_generator_signals)
+
 
         with open("trigger_rtlink_layout.txt", "w+") as fp:
             for row, elements in enumerate(list(divide_chunks(trigger_generator_labels, 32))):
@@ -83,13 +88,12 @@ class RtioTriggerController(Module):
                 {
                     "channel_layout": trigger_rtlink_layout, 
                     "channels": trigger_channels, 
-                    "sw_trigger_start": len(trigger_channel_signals)*adr_per_channel, 
+                    "sw_trigger_start": len(trigger_generators), 
                     "sw_trigger_num": rtlink_triggers_no
-                }, fp=fp, indent=4)
+                }, fp=fp)
 
-        matrix_row_width = len(trigger_generator_signals)
         address_width = len(Signal(max=len(trigger_channel_signals)*adr_per_channel))
-
+        
         if adr_per_channel > 1:
             iface_width = 32
         else:
@@ -99,8 +103,14 @@ class RtioTriggerController(Module):
             rtlink.OInterface(data_width=iface_width, address_width=address_width),
             rtlink.IInterface(data_width=iface_width, timestamped=False))
 
+        # trigger_matrix_n_x_n = []
+        # for i in range(len(trigger_generator_signals)):
+        #     trigger_matrix = Array(Signal(matrix_row_width) for _ in range(len(trigger_channel_signals)))
+        #     trigger_matrix_n_x_n.append(trigger_matrix)
+
+
         trigger_matrix = Array(Signal(matrix_row_width) for _ in range(len(trigger_channel_signals)))
-        
+
         trigger_matrix_signals = []
         for ch in range(len(trigger_channels)):
             for i in range(adr_per_channel):
@@ -125,7 +135,7 @@ class RtioTriggerController(Module):
             *([rtlink_trigger.eq(0) for rtlink_trigger in rtlink_trigger_generator_signals]),
 
             If(self.rtlink.o.stb & rtlink_wen,
-                If(rtlink_address < len(trigger_channel_signals)*adr_per_channel,
+                If(rtlink_address < len(trigger_channel_signals)*len(trigger_channel_signals)*adr_per_channel,
                     trigger_matrix_view[rtlink_address].eq(self.rtlink.o.data)
                 ).
                 Else(
@@ -164,7 +174,14 @@ class RtioTriggerController(Module):
                                                                    trigger_matrix, trigger_channel_reg_1, trigger_channel_reg_2, trigger_channel_out):
             self.comb += [
                 trigger_channel.eq(
-                    reduce(or_, Cat(rtlink_trigger_generator_signals)) | reduce(and_, (Cat(trigger_delay_generator_signals) & trigger_matrix_row))
+                    # reduce(or_, Cat(rtlink_trigger_generator_signals)) |
+                    # reduce(and_,
+                    #        ((Cat(trigger_delay_generator_signals) & trigger_matrix[trigger_matrix_row]) | ~trigger_matrix_row)
+                    #        )
+                    reduce(or_, Cat(rtlink_trigger_generator_signals)) |
+                    reduce(and_,
+                           ((Cat(trigger_delay_generator_signals) & (Cat(trigger_matrix_row))) | ~Cat(trigger_matrix_row))
+                           )
                 ),
                 If(reg1 == reg2,
                    out.eq(1)
@@ -179,6 +196,8 @@ class RtioTriggerController(Module):
             ]
 
 
+
+
 class SimulationWrapper(Module):
 
     def __init__(self):
@@ -189,7 +208,7 @@ class SimulationWrapper(Module):
         trig_gen_no = 2
         trig_ch_no = 2
 
-        trigger_generator_signals = [Signal(name=f"trig_gen_{i}") for i in range(trig_gen_no)]
+        trigger_generator_signals = [Signal(name=f"trigger_{i}") for i in range(trig_gen_no)]
         trigger_generator_labels = [f"TG{i}" for i in range(trig_gen_no)]
         print(trigger_generator_signals)
 
@@ -199,7 +218,7 @@ class SimulationWrapper(Module):
         trigger_generators = [{"signal": s, "label": l} for s, l in zip(trigger_generator_signals, trigger_generator_labels)]
         trigger_channels = [{"signal": s, "label": l} for s, l in zip(trigger_channel_signals, trigger_channel_labels)]
 
-        self.submodules.dut = dut = TriggerController(trigger_generators=trigger_generators, trigger_channels=trigger_channels)
+        self.submodules.dut = dut = RtioTriggerController(trigger_generators=trigger_generators, trigger_channels=trigger_channels)
 
         self.io = {
             cd_dclk.rst,
@@ -220,7 +239,7 @@ class SimulationWrapper(Module):
 if __name__ == "__main__":
 
     from migen.build.xilinx import common
-    from gateware.simulation.common import update_tb
+    # from gateware.simulation.common import update_tb
 
     module = SimulationWrapper()
 
@@ -229,4 +248,4 @@ if __name__ == "__main__":
                     # special_overrides=so,
                     ios=module.io,
                     create_clock_domains=False).write("trigger_controller.v")
-    update_tb("trigger_controller.v")
+    # update_tb("trigger_controller.v")
