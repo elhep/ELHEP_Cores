@@ -372,7 +372,7 @@ class FmcAdc100M10b16chaTdc(_FMC):
 
         target.register_coredevice(
                 device_id=f"fmc{fmc}",
-                module="elhep_cores.coredevice.fmc_adc100M_10B_tdc_16cha",
+                module="elhep_cores.coredevice.fmc_adc100M_10b_tdc_16cha",
                 class_name="FmcAdc100M10bTdc16cha",
                 arguments={
                     "prefix": "fmc1"

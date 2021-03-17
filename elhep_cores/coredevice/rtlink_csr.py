@@ -34,13 +34,13 @@ class RtlinkCsr:
             self.core.break_realtime()
             return self.read_rt()
 
-    def __init__(self, dmgr, channel, config, core_device="core"):
+    def __init__(self, dmgr, channel, regs, core_device="core"):
         self.channel = channel
         self.core = dmgr.get(core_device)
         self.ref_period_mu = self.core.seconds_to_mu(
             self.core.coarse_ref_period)
 
-        for address, reg in enumerate(config):
+        for address, reg in enumerate(regs):
             new_reg = RtlinkCsr.Reg(
                 channel=self.channel, 
                 address=address,

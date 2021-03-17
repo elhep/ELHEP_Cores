@@ -6,7 +6,6 @@ from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from elhep_cores.cores.xilinx import XilinxIdelayE2
 from elhep_cores.cores.rtlink_csr import RtLinkCSR
-from elhep_cores.cores.xilinx_ila import ILAProbe
 
 from artiq.gateware import rtio
 
@@ -160,14 +159,6 @@ class ADS5296A_XS7(Module):
                                       i_BITSLIP=bitslip,
                                       i_DYNCLKDIVSEL=0,
                                       i_DYNCLKSEL=0)
-
-        # Debugging definition
-
-        self.submodules += [
-            ILAProbe(self.bitslip_done, "bitslip_done"),
-            ILAProbe(self.data_o[0], "data_0"),
-            ILAProbe(self.data_o[8], "data_8"),
-        ]
 
 
 class SimulationWrapper(Module):

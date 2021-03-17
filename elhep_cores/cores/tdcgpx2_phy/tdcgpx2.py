@@ -7,7 +7,6 @@ from artiq.gateware import rtio
 
 from elhep_cores.cores.rtlink_csr import RtLinkCSR
 from elhep_cores.cores.xilinx import *
-from elhep_cores.cores.xilinx_ila import ILAProbe
 
 
 class TdcGpx2Phy(Module):
@@ -67,7 +66,7 @@ class TdcGpx2ChannelPhy(Module):
         # ==========================================
 
         regs = [
-            ("frame_length", max_frame_length.bit_length(), 44),
+            ("frame_length", max_frame_length.bit_length(), 22),
             ("frame_delay_value", 5),
             ("data_delay_value", 5)
         ]
@@ -87,7 +86,7 @@ class TdcGpx2ChannelPhy(Module):
             delay_value_ld_i=csr.frame_delay_value_ld))
 
         self.sync += [frame.eq(frame << 1 | frame_in)]
-        frame_start = Signal()
+        self.frame_start = frame_start = Signal()
         self.comb += frame_start.eq(frame[0] & ~frame[1])
 
         data_delayed = Signal()

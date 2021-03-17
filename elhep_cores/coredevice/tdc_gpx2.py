@@ -4,7 +4,7 @@ from artiq.language.core import kernel, rpc
 from artiq.language.core import portable
 from artiq.language.types import TInt32
 from artiq.language.units import ns, us, ms
-from coredevice.rtlink_csr import RtlinkCsr
+from elhep_cores.coredevice.rtlink_csr import RtlinkCsr
 from artiq.coredevice.ttl import TTLOut
 import re
 

@@ -1,3 +1,5 @@
+import os
+
 from migen import *
 from migen.build import tools
 from migen.genlib.cdc import MultiReg, BusSynchronizer
@@ -22,13 +24,15 @@ class ILAProbeAsync(Module):
 
 class ILAProbe(Module):
     def __init__(self, signal, name=None):
-        signal.attr.add(("mark_debug", "true"))
-        if name:
-            signal.name_override = name
+        int_sig = Signal.like(signal)
+        int_sig.attr.add(("mark_debug", "true"))
+        int_sig.name_override = name
+        self.comb += int_sig.eq(signal)
 
 
-def add_xilinx_ila(target, debug_clock, depth=1024):
-    tools.write_to_file("insert_ila.tcl", insert_ila_script())
+def add_xilinx_ila(target, debug_clock, output_dir, depth=1024):
+    os.makedirs(os.path.join(output_dir, "gateware"), exist_ok=True)
+    tools.write_to_file(os.path.join(output_dir, "gateware", "insert_ila.tcl"), insert_ila_script())
     target.platform.toolchain.postsynthesis_commands.append("source insert_ila.tcl")
     target.platform.toolchain.postsynthesis_commands.append(
         f"batch_insert_ila {{{depth}}}")

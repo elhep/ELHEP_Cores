@@ -4,7 +4,7 @@ from artiq.language import TInt32, TInt64
 from artiq.language.core import kernel, delay_mu
 from artiq.language.core import rpc
 from artiq.language.units import us, ns, ms
-from coredevice.rtlink_csr import RtlinkCsr
+from elhep_cores.coredevice.rtlink_csr import RtlinkCsr
 from artiq.coredevice.ttl import TTLOut
 from artiq.coredevice.exceptions import RTIOOverflow
 from numpy import int64, int32

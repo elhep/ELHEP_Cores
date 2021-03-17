@@ -83,7 +83,7 @@ class RtioTriggerController(Module):
                 {
                     "channel_layout": trigger_rtlink_layout, 
                     "channels": trigger_channels, 
-                    "sw_trigger_start": len(trigger_generator_signals), 
+                    "sw_trigger_start": len(trigger_channel_signals)*adr_per_channel, 
                     "sw_trigger_num": rtlink_triggers_no
                 }, fp=fp, indent=4)
 
