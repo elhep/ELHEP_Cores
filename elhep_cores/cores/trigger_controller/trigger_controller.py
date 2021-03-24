@@ -54,13 +54,13 @@ class RtioTriggerController(Module):
                 trigger_generator_labels.append(trigger['label'])
         
 
-        rtlink_trigger_generator_signals = [Signal() for _ in range(rtlink_triggers_no)]
+        self.sw_trigger_signals = rtlink_trigger_generator_signals = [Signal() for _ in range(rtlink_triggers_no)]
         rtlink_trigger_array = Array(rtlink_trigger_generator_signals)
 
         trigger_generator_labels += [f"SW Trigger {i}" for i in range(rtlink_triggers_no)]
 
-        trigger_channel_signals = [dsc["signal"] for dsc in trigger_channels]
-        trigger_channel_labels = [dsc["label"] for dsc in trigger_channels]
+        self.trigger_channel_signals = trigger_channel_signals = [dsc["signal"] for dsc in trigger_channels]
+        self.trigger_channel_labels = trigger_channel_labels = [dsc["label"] for dsc in trigger_channels]
 
         trigger_generators_num = len(trigger_generator_signals) + len(rtlink_trigger_generator_signals)
         adr_per_channel = (trigger_generators_num+31)//32
@@ -117,7 +117,7 @@ class RtioTriggerController(Module):
         # print(len(trigger_generator_signals))
 
         # trigger_matrix = Array(Signal(matrix_row_width) for _ in range(len(trigger_channel_signals)))
-        trigger_matrix = Array(Signal(matrix_row_width) for _ in range(len(trigger_generator_signals)))
+        self.trigger_matrix = trigger_matrix = Array(Signal(matrix_row_width) for _ in range(len(trigger_generator_signals)))
 
         trigger_matrix_signals = []
         for ch in range(len(trigger_channels)):

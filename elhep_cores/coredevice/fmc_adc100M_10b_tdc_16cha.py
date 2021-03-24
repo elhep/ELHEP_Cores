@@ -68,10 +68,16 @@ class FmcAdc100M10bTdc16cha:
         self.clock.initialize()
         for adc in self.adc:
             adc.initialize()
+
+        self.idx_src_sel.on()
+        for i in range(4):
+            self.tdc_disable[i].off()
+        delay(100*ns)
         for tdc in self.tdc:
             tdc.initialize()
+            tdc.start_measurement()
         # TDC counter reset from FMC
-        # self.idx_src_sel.on()
-        # for i in range(4):
-        #     self.tdc_disable[i].off()
+        
+        self.idx_in.pulse(100*ns)
+        
 

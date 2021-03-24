@@ -1,4 +1,4 @@
-from artiq.language.core import kernel, delay, portable
+from artiq.language.core import kernel, delay, delay_mu, portable
 from artiq.language.units import ns
 from artiq.coredevice.rtio import rtio_output, rtio_input_data
 from artiq.language.types import TInt32
@@ -18,6 +18,7 @@ class RtlinkCsr:
         @kernel
         def write_rt(self, data):
             rtio_output((self.channel << 8) | self.address << 1 | 1, data & ((0x1 << self.length)-1))
+            delay_mu(1)
 
         @kernel
         def write(self, data):
@@ -27,6 +28,7 @@ class RtlinkCsr:
         @kernel
         def read_rt(self) -> TInt32:
             rtio_output((self.channel << 8) | self.address << 1 | 0, 0)
+            delay_mu(1)
             return rtio_input_data(self.channel)
 
         @kernel

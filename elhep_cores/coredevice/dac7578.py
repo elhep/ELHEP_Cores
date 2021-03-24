@@ -13,6 +13,9 @@ class DAC7578:
 
     @kernel
     def set_mu(self, ch, value):
+        command = (0b0011 << 4) | (ch & 0xF)
         v0 = (value >> 4) & 0xFF
         v1 = (value << 4) & 0xFF
-        i2c_write_many(self.busno, self.address, 0b0011 | (ch & 0xF), [v0, v1])
+        print(command, v0, v1)
+        self.core.break_realtime()
+        i2c_write_many(self.busno, self.address, command, [v0, v1])

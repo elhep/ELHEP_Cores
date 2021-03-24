@@ -57,32 +57,60 @@ class TDCGPX2:
         self.phy = [dmgr.get(f"{phy_csr_prefix}{i}") for i in range(4)]
 
         self.readout = [0] * 24
+        self.spi_readout = [0] * 24
+
+        # self.regs = [
+        #     ( 0, 0b11011111),  # All pins but DISABLE are enabled
+        #     ( 1, 0b00001111),  # High res off, combine: independent channels, HIT_ENA on
+        #     ( 2, 0b00111001),  # Block-wise FIFO off, common FIFO off, LVDS DDR, 20b stop, 2b ref idx
+        #     # REFCLK period is 100ns (10MHz), to get 1ps divider must be 1000*100: 0b11000011010100000
+        #     ( 3, 0b10100000),  # REFCLK_DIV lower 8bits
+        #     ( 4, 0b10000110),  # REFCLK_DIV middle 8bits
+        #     ( 5, 0b00000001),  # REFCLK_DIV upper 4bits
+        #     ( 6, 0b11000000),  # test pattern disabled
+        #     ( 7, 0b01010011),  # quartz disabled, LVDS data adjustment 0ps
+        #     ( 8, 0b10100001),  # fixed value
+        #     ( 9, 0b00010011),  # fixed value
+        #     (10, 0b00000000),  # fixed value
+        #     (11, 0b00001010),  # fixed value
+        #     (12, 0b11001100),  # fixed value
+        #     (13, 0b11001100),  # fixed value
+        #     (14, 0b11110001),  # fixed value
+        #     (15, 0b01111101),  # fixed value
+        #     (16, 0b00000000),  # LVDS input level
+        # ]
 
         self.regs = [
-            ( 0, 0b10111111),  # All pins but DISABLE are enabled
-            ( 1, 0b00001111),  # High res off, combine: independent channels, HIT_ENA on
-            ( 2, 0b00111001),  # Block-wise FIFO off, common FIFO off, LVDS DDR, 20b stop, 2b ref idx
-            # REFCLK period is 100ns (10MHz), to get 1ps divider must be 1000*100: 0b11000011010100000
-            ( 3, 0b10100000),  # REFCLK_DIV lower 8bits
-            ( 4, 0b10000110),  # REFCLK_DIV middle 8bits
-            ( 5, 0b00000001),  # REFCLK_DIV upper 4bits
-            ( 6, 0b11000000),  # test pattern disabled
-            ( 7, 0b01010011),  # quartz disabled, LVDS data adjustment 0ps
-            ( 8, 0b10100001),  # fixed value
-            ( 9, 0b00010011),  # fixed value
-            (10, 0b00000000),  # fixed value
-            (11, 0b00001010),  # fixed value
-            (12, 0b11001100),  # fixed value
-            (13, 0b11001100),  # fixed value
-            (14, 0b01111101),  # fixed value
-            (15, 0b01111101),  # fixed value
-            (16, 0b00000000),  # LVDS input level
+            (0, 0x3F),
+            (1, 0x0F),
+            (2, 0x39),
+            (3, 0xA0),
+            (4, 0x86),
+            (5, 0x01),
+            (6, 0xC0),
+            (7, 0x53),
+            (8, 0xA1),
+            (9, 0x13),
+            (10, 0x00),
+            (11, 0x0A),
+            (12, 0xCC),
+            (13, 0xCC),
+            (14, 0xF1),
+            (15, 0x7D),
+            (16, 0x00),
+            (17, 0x00),
+            (18, 0x00),
+            (19, 0x00)
         ]
 
     @kernel
     def write_op(self, op, end=False):
         cs = self.chip_select
         if self.chip_select == 0:
+            self.csn_device.off()
+            delay(100*ns)
+            self.csn_device.on()
+            delay(100*ns)
             self.csn_device.off()
             cs = 1
             delay(300*ns)
@@ -168,12 +196,14 @@ class TDCGPX2:
             re = self.readout[a]
             _, ro = self.regs[a]
             if re != ro:
-                raise ValueError("TDC GPX-2: Invalid readout at address")
+                raise ValueError("TDC GPX-2: Invalid readout")
 
     @kernel
     def start_measurement(self):
         self.core.break_realtime()
+        delay(1*ms)
         self.initialization_reset()
+        delay(1*ms)
 
     @kernel
     def enable_lvds_test_pattern(self):
@@ -186,6 +216,13 @@ class TDCGPX2:
         self.write_reg_rt(6, 0b11000000)
 
     @kernel
+    def read_results(self):
+        self.core.break_realtime()
+        for i in range(24):
+            self.spi_readout[i] = self.read_rt(8+i)
+            delay(100*ns)    
+
+    @kernel
     def read_configuration(self):
         self.core.break_realtime()
 
@@ -193,7 +230,6 @@ class TDCGPX2:
 
         for i in range(24):
             self.readout[i] = self.read_rt(i)
-        return self.readout
 
 
 
