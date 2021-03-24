@@ -157,22 +157,22 @@ class StandaloneBase(MiniSoC, AMPSoC, DdbManager):
         add_identifier(self)
         self.output_dir = output_dir
         
-        i2c = self.platform.request("i2c")
-        self.i2c_buses = [
-            [i2c.scl, i2c.sda, "afck_i2c"]
-        ]
+        # i2c = self.platform.request("i2c")
+        self.i2c_buses = []
+        #     [i2c.scl, i2c.sda, "afck_i2c"]
+        # ]
 
         self.add_design()
         
-        scl_signal = Cat([bus[0] for bus in self.i2c_buses])
-        sda_signal = Cat([bus[1] for bus in self.i2c_buses])
-        self.submodules.i2c = gpio.GPIOTristate([scl_signal, sda_signal])
-        self.csr_devices.append("i2c")
+        # scl_signal = Cat([bus[0] for bus in self.i2c_buses])
+        # sda_signal = Cat([bus[1] for bus in self.i2c_buses])
+        # self.submodules.i2c = gpio.GPIOTristate([scl_signal, sda_signal])
+        
 
         self.print_design_info()
         self.store_ddb(output_dir)
 
-        self.config["I2C_BUS_COUNT"] = len(self.i2c_buses)
+        self.config["I2C_BUS_COUNT"] = 1  # len(self.i2c_buses)
         self.config["RTIO_FREQUENCY"] = "125.0"
         self.config["NO_FLASH_BOOT"] = None
         self.config["HAS_RTIO_LOG"] = None

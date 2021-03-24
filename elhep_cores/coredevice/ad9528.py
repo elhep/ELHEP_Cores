@@ -79,7 +79,7 @@ class AD9528:
         self.spi.set_config_mu(flags=SPI_CONFIG | spi.SPI_END, length=24, div=self.div, cs=cs)
         delay(1000*ns)
         self.spi.write(((0 << 15) | ((addr & 0x7FFF) << 8) | (data & 0xFF)) << 8)
-        delay(100*ns)
+        delay(1000*ns)
 
         if self.chip_select == 0:
             self.csn_device.on()

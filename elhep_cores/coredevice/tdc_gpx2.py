@@ -61,7 +61,7 @@ class TDCGPX2:
         self.regs = [
             ( 0, 0b10111111),  # All pins but DISABLE are enabled
             ( 1, 0b00001111),  # High res off, combine: independent channels, HIT_ENA on
-            ( 2, 0b00111101),  # Block-wise FIFO off, common FIFO off, LVDS DDR, 20b stop, 24b ref idx
+            ( 2, 0b00111001),  # Block-wise FIFO off, common FIFO off, LVDS DDR, 20b stop, 2b ref idx
             # REFCLK period is 100ns (10MHz), to get 1ps divider must be 1000*100: 0b11000011010100000
             ( 3, 0b10100000),  # REFCLK_DIV lower 8bits
             ( 4, 0b10000110),  # REFCLK_DIV middle 8bits

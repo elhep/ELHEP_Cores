@@ -48,13 +48,13 @@ class RtioTriggerController(Module):
                 trigger_generator_labels.append(trigger['label'])
         
 
-        rtlink_trigger_generator_signals = [Signal() for _ in range(rtlink_triggers_no)]
+        self.sw_trigger_signals = rtlink_trigger_generator_signals = [Signal() for _ in range(rtlink_triggers_no)]
         rtlink_trigger_array = Array(rtlink_trigger_generator_signals)
 
         trigger_generator_labels += [f"SW Trigger {i}" for i in range(rtlink_triggers_no)]
 
-        trigger_channel_signals = [dsc["signal"] for dsc in trigger_channels]
-        trigger_channel_labels = [dsc["label"] for dsc in trigger_channels]
+        self.trigger_channel_signals = trigger_channel_signals = [dsc["signal"] for dsc in trigger_channels]
+        self.trigger_channel_labels = trigger_channel_labels = [dsc["label"] for dsc in trigger_channels]
 
         trigger_generators_num = len(trigger_generator_signals) + len(rtlink_trigger_generator_signals)
         adr_per_channel = (trigger_generators_num+31)//32
@@ -88,9 +88,9 @@ class RtioTriggerController(Module):
                 {
                     "channel_layout": trigger_rtlink_layout, 
                     "channels": trigger_channels, 
-                    "sw_trigger_start": len(trigger_generators), 
+                    "sw_trigger_start": len(trigger_channel_signals)*adr_per_channel, 
                     "sw_trigger_num": rtlink_triggers_no
-                }, fp=fp)
+                }, fp=fp, indent=4)
 
         address_width = len(Signal(max=len(trigger_channel_signals)*adr_per_channel))
         
@@ -109,7 +109,7 @@ class RtioTriggerController(Module):
         #     trigger_matrix_n_x_n.append(trigger_matrix)
 
 
-        trigger_matrix = Array(Signal(matrix_row_width) for _ in range(len(trigger_channel_signals)))
+        self.trigger_matrix = trigger_matrix = Array(Signal(matrix_row_width) for _ in range(len(trigger_channel_signals)))
 
         trigger_matrix_signals = []
         for ch in range(len(trigger_channels)):
@@ -135,7 +135,7 @@ class RtioTriggerController(Module):
             *([rtlink_trigger.eq(0) for rtlink_trigger in rtlink_trigger_generator_signals]),
 
             If(self.rtlink.o.stb & rtlink_wen,
-                If(rtlink_address < len(trigger_channel_signals)*len(trigger_channel_signals)*adr_per_channel,
+                If(rtlink_address < len(trigger_channel_signals)*adr_per_channel,
                     trigger_matrix_view[rtlink_address].eq(self.rtlink.o.data)
                 ).
                 Else(
