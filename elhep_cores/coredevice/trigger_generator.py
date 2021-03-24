@@ -24,7 +24,7 @@ class TriggerGenerator:
 
         
     @kernel
-    def read_trigger_value(self, address, data):
+    def read_trigger_value(self, address):
         value = self.read((self.channel << 8) | address << 1 | 0, 0)
         return value
 
