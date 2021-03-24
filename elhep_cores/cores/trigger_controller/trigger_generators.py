@@ -86,10 +86,10 @@ class BaselineTriggerGenerator(TriggerGenerator):
         data_prev = Signal(len(data) * treshold_length)
 
         above_comparison_list = [
-            data_prev[i * len(data):(i + 1) * len(data)] >= trigger_level + trigger_level_offset for i in
+            data_prev[i * len(data):(i + 1) * len(data)] > trigger_level + trigger_level_offset for i in
                 range(treshold_length)]
         below_comparison_list = [
-            data_prev[i * len(data):(i + 1) * len(data)] <= trigger_level + trigger_level_offset for i in
+            data_prev[i * len(data):(i + 1) * len(data)] < trigger_level + trigger_level_offset for i in
                 range(treshold_length)]
         data_above = Signal()
         data_below = Signal()
