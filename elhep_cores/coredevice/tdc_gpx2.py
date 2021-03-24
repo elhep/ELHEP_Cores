@@ -181,6 +181,11 @@ class TDCGPX2:
         self.write_reg_rt(6, 0b11010000)
 
     @kernel
+    def disable_lvds_test_pattern(self):
+        self.core.break_realtime()
+        self.write_reg_rt(6, 0b11000000)
+
+    @kernel
     def read_configuration(self):
         self.core.break_realtime()
 
