@@ -56,8 +56,7 @@ class TDCGPX2:
         self.div = self.spi.frequency_to_div(spi_freq)
         self.phy = [dmgr.get(f"{phy_csr_prefix}{i}") for i in range(4)]
 
-        self.readout = [0] * 24
-        self.spi_readout = [0] * 24
+        
 
         # self.regs = [
         #     ( 0, 0b11011111),  # All pins but DISABLE are enabled
@@ -81,7 +80,7 @@ class TDCGPX2:
         # ]
 
         self.regs = [
-            (0, 0x3F),
+            (0, 0b00011111),
             (1, 0x0F),
             (2, 0x39),
             (3, 0xA0),
@@ -103,63 +102,44 @@ class TDCGPX2:
             (19, 0x00)
         ]
 
+        self.config_readout = [0] * len(self.regs)
+        self.result_readout = [0] * 4 * 6
+
+    @kernel
+    def start_spi_transaction(self):
+        self.csn_device.off()
+        delay(1*us)
+    
+    @kernel
+    def end_spi_transaction(self):
+        self.csn_device.on()
+        delay(10 * us)
+
     @kernel
     def write_op(self, op, end=False):
-        cs = self.chip_select
-        if self.chip_select == 0:
-            self.csn_device.off()
-            delay(100*ns)
-            self.csn_device.on()
-            delay(100*ns)
-            self.csn_device.off()
-            cs = 1
-            delay(300*ns)
-
-        if end:
-            flags = SPI_CONFIG | spi.SPI_END
-        else:
-            flags = SPI_CONFIG
-
-        self.spi.set_config_mu(flags, 8, self.div, cs)
+        self.start_spi_transaction()
+        flags = (SPI_CONFIG | spi.SPI_END) if end else SPI_CONFIG
+        self.spi.set_config_mu(flags, 8, self.div, 1)  # fixme: csn
+        delay(32*ns)
         self.spi.write((op & 0xFF) << 24)
-
-        if end and self.chip_select == 0:
-            delay(300 * ns)
-            self.csn_device.on()
-            delay(10 * us)
+        if end:
+            self.end_spi_transaction()
 
     @kernel
-    def write_data(self, data):
-        self.spi.set_config_mu(SPI_CONFIG | spi.SPI_END, 8, self.div, 1)  # fixme: chip select
-        self.spi.write((data & 0xFF) << 24)
-
-    @kernel
-    def read_rt(self, addr) -> TInt32:
-        cs = self.chip_select
-        if self.chip_select == 0:
-            self.csn_device.off()
-            cs = 1
-            delay(50 * ns)
-
-        self.spi.set_config_mu(SPI_CONFIG, 8, self.div, cs)
-        self.spi.write(((0x40 | (addr & 0x1F)) << 24))
-        self.spi.set_config_mu(SPI_CONFIG | spi.SPI_INPUT | spi.SPI_END, 8, self.div, cs)
+    def read_reg_rt(self, addr) -> TInt32:
+        self.write_op(0x40 | (addr & 0x1F), end=False)
+        self.spi.set_config_mu(SPI_CONFIG | spi.SPI_INPUT | spi.SPI_END, 8, self.div, 1)  # fixme: chip select
         self.spi.write(0)
-
-        if self.chip_select == 0:
-            self.csn_device.on()
-            delay(10 * us)
-
+        self.end_spi_transaction()
         return self.spi.read()
 
     @kernel
     def write_reg_rt(self, address, value):
         self.write_op(0x80 | address, end=False)
         delay(51*us)
-        self.write_data(value & 0xFF)
-        if self.chip_select == 0:
-            delay(300 * ns)
-            self.csn_device.on()
+        self.spi.set_config_mu(SPI_CONFIG | spi.SPI_END, 8, self.div, 1)  # fixme: chip select
+        self.spi.write((value & 0xFF) << 24)
+        self.end_spi_transaction()
 
     @kernel
     def write_config_registers(self):
@@ -167,43 +147,45 @@ class TDCGPX2:
         delay(51*us)
         for r in self.regs:
             _, data = r
-            self.write_data(data & 0xFF)
+            self.spi.set_config_mu(SPI_CONFIG, 8, self.div, 1)  # fixme: chip select
+            self.spi.write((data & 0xFF) << 24)
             delay(20800 * ns)
+        self.end_spi_transaction()
 
-        if self.chip_select == 0:
-            delay(300 * ns)
-            self.csn_device.on()
+    @kernel
+    def read_config_registers(self):
+        # for i in range(len(self.regs)):
+        #     self.config_readout[i] = self.read_reg_rt(i)
+        self.sequential_read(0x40, 0x0, self.config_readout)
 
-        delay(100 * ns)
+    @kernel
+    def read_results(self):
+        self.core.break_realtime()
+        self.sequential_read(0x60, 8, self.result_readout)
+
+    @kernel
+    def sequential_read(self, opcode, start_address, target):
+        self.write_op(opcode | start_address, end=False)
+        delay(51*us)
+        for i in range(len(target)):
+            if i == len(target) - 1:
+                flags = SPI_CONFIG | spi.SPI_INPUT | spi.SPI_END
+            else:
+                flags = SPI_CONFIG | spi.SPI_INPUT
+            delay(10*us)
+            self.spi.set_config_mu(flags, 8, self.div, 1)
+            self.spi.write(0)
+            target[i] = self.spi.read()
+            delay(1000*ns)
+        self.end_spi_transaction()
 
     @kernel
     def power_on_reset(self):
         self.write_op(0x30, end=True)
 
     @kernel
-    def initialization_reset(self):
-        self.write_op(0x18, end=True)
-
-    @kernel
-    def initialize(self):
-        self.core.break_realtime()
-        self.power_on_reset()
-        delay(4*ms)
-        self.write_config_registers()
-        self.read_configuration()
-
-        for a in range(17):
-            re = self.readout[a]
-            _, ro = self.regs[a]
-            if re != ro:
-                raise ValueError("TDC GPX-2: Invalid readout")
-
-    @kernel
     def start_measurement(self):
-        self.core.break_realtime()
-        delay(1*ms)
-        self.initialization_reset()
-        delay(1*ms)
+        self.write_op(0x18, end=True)
 
     @kernel
     def enable_lvds_test_pattern(self):
@@ -216,20 +198,24 @@ class TDCGPX2:
         self.write_reg_rt(6, 0b11000000)
 
     @kernel
-    def read_results(self):
+    def initialize(self):
         self.core.break_realtime()
-        for i in range(24):
-            self.spi_readout[i] = self.read_rt(8+i)
-            delay(100*ns)    
+        self.power_on_reset()
+        delay(4*ms)
+        self.write_config_registers()
+        self.read_config_registers()
 
-    @kernel
-    def read_configuration(self):
-        self.core.break_realtime()
+        for a in range(len(self.regs)):
+            ro = self.config_readout[a]
+            _, re = self.regs[a]
+            if re != ro:
+                print(a, re, ro)
+                raise ValueError("TDC GPX-2: Invalid readout")
 
-        self.write_op(0x40, end=True)
+        delay(10*us)
+    
 
-        for i in range(24):
-            self.readout[i] = self.read_rt(i)
+    
 
 
 

@@ -75,9 +75,3 @@ class FmcAdc100M10bTdc16cha:
         delay(100*ns)
         for tdc in self.tdc:
             tdc.initialize()
-            tdc.start_measurement()
-        # TDC counter reset from FMC
-        
-        self.idx_in.pulse(100*ns)
-        
-
