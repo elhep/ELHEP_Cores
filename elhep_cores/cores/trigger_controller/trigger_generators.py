@@ -76,27 +76,23 @@ class BaselineTriggerGenerator(TriggerGenerator):
         assert len(data) == len(trigger_level), "Trigger level width must be equal to data width"
         
         self.trigger_level = trigger_level
-        self.submodules.baseline_generator = baseline_gen = SignalBaseline(len(data))
-        self.trigger_level_offset = trigger_level_offset = Signal.like(data)
-        self.comb += [
-            baseline_gen.i.eq(data),
-            trigger_level_offset.eq(baseline_gen.o)
-        ]
+        # # self.submodules.baseline_generator = baseline_gen = SignalBaseline(len(data))
+        # self.trigger_level_offset = trigger_level_offset = Signal.like(data)
+        # self.comb += [
+        #     baseline_gen.i.eq(data),
+        #     trigger_level_offset.eq(baseline_gen.o)
+        # ]
 
         data_prev = Signal(len(data) * treshold_length)
 
         above_comparison_list = [
-            data_prev[i * len(data):(i + 1) * len(data)] > trigger_level for i in
-                range(treshold_length)]
+            # data_prev[i * len(data):(i + 1) * len(data)] > trigger_level + trigger_level_offset for i in
+            #     range(treshold_length)]
+            data_prev[i * len(data):(i + 1) * len(data)] > trigger_level for i in range(treshold_length)]
         below_comparison_list = [
-            data_prev[i * len(data):(i + 1) * len(data)] < trigger_level for i in
-                range(treshold_length)]
-        # above_comparison_list = [
-        #     data_prev[i * len(data):(i + 1) * len(data)] > trigger_level + trigger_level_offset for i in
-        #         range(treshold_length)]
-        # below_comparison_list = [
-        #     data_prev[i * len(data):(i + 1) * len(data)] < trigger_level + trigger_level_offset for i in
-        #         range(treshold_length)]
+            # data_prev[i * len(data):(i + 1) * len(data)] < trigger_level + trigger_level_offset for i in
+            #     range(treshold_length)]
+            data_prev[i * len(data):(i + 1) * len(data)] < trigger_level for i in range(treshold_length)]
         data_above = Signal()
         data_below = Signal()
 

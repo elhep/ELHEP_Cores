@@ -1,4 +1,4 @@
-from artiq.language.units import ns, us
+from artiq.language.units import ns, us, ms
 from artiq.language.core import kernel
 
 
@@ -75,3 +75,5 @@ class FmcAdc100M10bTdc16cha:
         delay(100*ns)
         for tdc in self.tdc:
             tdc.initialize()
+        delay(10*ms)
+        self.idx_in.pulse(1*us)
