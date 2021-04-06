@@ -28,12 +28,19 @@ class CircularDAQ(Module):
     No readout is implemented. 
     """
 
-    def __init__(self, data_i, stb_i, trigger_rio_phy, 
+    def __init__(self, data_i, stb_i, trigger_rio_phy, trigger_reset_rio_phy=None, 
         circular_buffer_length=128, trigger_cnt_len=4):
 
         data_width = len(data_i)
         assert data_width <= 32-trigger_cnt_len
-
+        if trigger_reset_rio_phy is None:
+            trigger_reset_dclk = Signal(reset=0)
+        else:
+            trigger_reset_dclk = Signal()
+            cdc = PulseSynchronizer("rio_phy", "dclk")
+            self.submodules += cdc
+            self.comb += [cdc.i.eq(trigger_reset_rio_phy), trigger_reset_dclk.eq(cdc.o)]
+        
         pretrigger_rio_phy = Signal(max=circular_buffer_length)
         posttrigger_rio_phy = Signal.like(pretrigger_rio_phy)
         self.pretrigger_dclk = pretrigger_dclk = Signal.like(pretrigger_rio_phy)
@@ -59,9 +66,11 @@ class CircularDAQ(Module):
         trigger_d = Signal()
 
         self.sync.dclk += [
-            If(trigger_dclk & ~trigger_d,  # detect trigger re
-                trigger_cnt.eq(trigger_cnt+1)),
-            trigger_d.eq(trigger_dclk)
+            If(trigger_reset_dclk == 1, trigger_cnt.eq(0)).Else(
+                If(trigger_dclk & ~trigger_d,  # detect trigger re
+                    trigger_cnt.eq(trigger_cnt+1)),
+                trigger_d.eq(trigger_dclk)
+            )
         ]
 
         # Data format (MSb first):
@@ -83,7 +92,7 @@ class CircularDAQ(Module):
 
         self.comb += [
             trigger_cdc.i.eq(trigger_rio_phy | sw_trigger),
-            trigger_dclk.eq(trigger_cdc.o),
+            trigger_dclk.eq(trigger_cdc.o & ~trigger_reset_dclk),
             circular_buffer.data_in.eq(cb_data_in),
             circular_buffer.we.eq(1),
             circular_buffer.trigger.eq(trigger_dclk),
