@@ -140,3 +140,23 @@ class RtioBaselineTriggerGenerator(BaselineTriggerGenerator):
         ]
             
         super().__init__(data, trigger_level_sys, treshold_length, name)
+
+
+class RtioTriggerGenerator(TriggerGenerator):
+
+    def __init__(self, name="sw_trigger"):
+        super().__init__(name)
+
+        # Outputs
+        self.trigger = Signal()  # CD: rio_phy
+        self.register_trigger(self.trigger, "trigger", ClockDomain("rio_phy"))
+
+         # Interface - rtlink
+        self.rtlink = rtlink_iface = rtlink.Interface(
+            rtlink.OInterface(data_width=1)
+        )
+
+        self.sync.rio_phy += [
+            self.trigger.eq(0),
+            If(rtlink_iface.o.stb, self.trigger.eq(1))
+        ]

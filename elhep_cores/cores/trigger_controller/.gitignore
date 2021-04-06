@@ -1,0 +1,4 @@
+tests/**
+!tests/Makefile
+!tests/tb_trigger_controller.py
+trigger_controller.json
