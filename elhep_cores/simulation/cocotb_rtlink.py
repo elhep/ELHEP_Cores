@@ -6,7 +6,7 @@ import csv
 
 class RtLinkIface:
 
-    def __init__(self, rio_phy_clock, stb_i, data_i, address_i=None, stb_o=None, data_o=None):
+    def __init__(self, rio_phy_clock, stb_i, data_i, address_i=None, stb_o=None, data_o=None, debug=False):
         self.rio_phy_clk = rio_phy_clock
 
         self.stb_i = stb_i
@@ -18,28 +18,29 @@ class RtLinkIface:
 
         self.clear_interface()
 
+        self.debug = debug
+
     def clear_interface(self):
         self.stb_i <= 0
         self.data_i <= 0
         if self.address_i:
             self.address_i <= 0
 
-    @cocotb.coroutine
-    def write(self, data, address=None):
-        yield FallingEdge(self.rio_phy_clk)
+    async def write(self, data, address=None):
+        if self.debug: print(f"rtlink write {data:x} >> {address}")
+        await FallingEdge(self.rio_phy_clk)
         self.stb_i <= 1
         if self.address_i:
             if address is None:
                 raise ValueError("Address required for RtLink")
             self.address_i <= address
         self.data_i <= data
-        yield FallingEdge(self.rio_phy_clk)
+        await FallingEdge(self.rio_phy_clk)
         self.clear_interface()
 
-    @cocotb.coroutine
-    def read(self, timeout=None):
+    async def read(self, timeout=None):
         while True:
-            yield RisingEdge(self.rio_phy_clk)
+            await RisingEdge(self.rio_phy_clk)
             if self.stb_o == 1:
                 return self.data_o
             if timeout is None:
