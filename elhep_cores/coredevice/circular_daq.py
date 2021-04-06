@@ -3,7 +3,7 @@ from artiq.language import TInt32, TInt64
 from artiq.language.core import kernel, delay_mu
 from artiq.language.core import rpc
 from artiq.language.units import us, ns, ms
-from coredevice.rtlink_csr import RtlinkCsr
+from elhep_cores.coredevice.rtlink_csr import RtlinkCsr
 from artiq.coredevice.ttl import TTLOut
 from artiq.coredevice.exceptions import RTIOOverflow
 from numpy import int64, int32
@@ -29,7 +29,7 @@ class CircularDaq:
     def configure(self, pretrigger, posttrigger):
         rtio_output((self.channel << 8) | 0, pretrigger)
         delay_mu(self.ref_period_mu)
-        rtio_output((self.channel << 8) | 0, posttrigger)
+        rtio_output((self.channel << 8) | 1, posttrigger)
         delay_mu(self.ref_period_mu)
         self.pretrigger = pretrigger
         self.posttrigger = posttrigger
@@ -57,3 +57,8 @@ class CircularDaq:
         ts = 0
         while ts >= 0:
             ts, data = rtio_input_timestamped_data(int64(100), int32(self.channel))
+
+    @kernel
+    def trigger(self):
+        rtio_output((self.channel << 8) | 2, 1)
+        delay_mu(self.ref_period_mu)
