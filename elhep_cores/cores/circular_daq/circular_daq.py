@@ -45,10 +45,13 @@ class CircularDAQ(Module):
             rtlink.OInterface(data_width=len(pretrigger_rio_phy), address_width=2),
             rtlink.IInterface(data_width=data_width+trigger_cnt_len, timestamped=True))
 
+        self.sw_trigger = sw_trigger = Signal()
         self.sync.rio_phy += [
+            sw_trigger.eq(0),
             If(rtlink_iface.o.stb,
                If(self.rtlink.o.address == 0, pretrigger_rio_phy.eq(rtlink_iface.o.data)),
                If(self.rtlink.o.address == 1, posttrigger_rio_phy.eq(rtlink_iface.o.data)),
+               If(self.rtlink.o.address == 2, sw_trigger.eq(1)),
             )
         ]
 
@@ -79,7 +82,7 @@ class CircularDAQ(Module):
         self.specials += [pretrigger_cdc, posttrigger_cdc]
 
         self.comb += [
-            trigger_cdc.i.eq(trigger_rio_phy),
+            trigger_cdc.i.eq(trigger_rio_phy | sw_trigger),
             trigger_dclk.eq(trigger_cdc.o),
             circular_buffer.data_in.eq(cb_data_in),
             circular_buffer.we.eq(1),
