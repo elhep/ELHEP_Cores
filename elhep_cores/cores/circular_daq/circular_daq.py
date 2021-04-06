@@ -36,7 +36,7 @@ class CircularDAQ(Module):
         if trigger_reset_rio_phy is None:
             trigger_reset_dclk = Signal(reset=0)
         else:
-            trigger_reset_dclk = Signal()
+            self.trigger_reset_dclk = trigger_reset_dclk = Signal()
             cdc = PulseSynchronizer("rio_phy", "dclk")
             self.submodules += cdc
             self.comb += [cdc.i.eq(trigger_reset_rio_phy), trigger_reset_dclk.eq(cdc.o)]
