@@ -12,7 +12,7 @@ from migen.build.generic_platform import *
 from misoc.interconnect.csr import *
 from misoc.cores import gpio
 from misoc.cores.a7_gtp import *
-from misoc.targets.afck1v1 import MiniSoC, BaseSoC, soc_afck1v1_argdict, soc_afck1v1_args
+from elhep_cores.targets.misoc.afck1v1 import MiniSoC, BaseSoC, soc_afck1v1_argdict, soc_afck1v1_args
 from misoc.integration.soc_sdram import soc_sdram_argdict
 from misoc.integration.builder import builder_args, builder_argdict
 
@@ -149,7 +149,6 @@ class StandaloneBase(MiniSoC, AMPSoC, DdbManager):
                          integrated_sram_size=8192,
                          ethmac_nrxslots=4,
                          ethmac_ntxslots=4,
-                         cpu_reset_address=0x000000, # 0x800000
                          crg=CRG,
                          **kwargs)
         AMPSoC.__init__(self)
