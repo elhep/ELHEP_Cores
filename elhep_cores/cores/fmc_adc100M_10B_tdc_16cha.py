@@ -150,7 +150,7 @@ class FmcAdc100M10b16chaTdc(_FMC):
             target.register_coredevice(
                 device_id=f"fmc{fmc}_cfd_offset_dac{i}",
                 module="elhep_cores.coredevice.dac7578", class_name="DAC7578",
-                arguments={"bus": 0, "address": address})  # FIXME: use valid bus id
+                arguments={"busno": 0, "address": address << 1})  # FIXME: use valid bus id
         
         # IOs
 
@@ -231,7 +231,6 @@ class FmcAdc100M10b16chaTdc(_FMC):
             class_name="AD9528",
             arguments={
                 "spi_device": f"fmc{fmc}_tdc_spi",
-                "phy_csr_prefix": f"fmc{fmc}_clock_dist",
                 "chip_select": f"fmc{fmc}_csn4"
             }
         )
