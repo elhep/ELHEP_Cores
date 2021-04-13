@@ -1,6 +1,6 @@
 from artiq.coredevice.rtio import rtio_output, rtio_input_timestamped_data, rtio_input_data
 from artiq.language import TInt32, TInt64
-from artiq.language.core import kernel, delay_mu
+from artiq.language.core import kernel, delay_mu, now_mu
 from artiq.language.core import rpc
 from artiq.language.units import us, ns, ms
 from elhep_cores.coredevice.rtlink_csr import RtlinkCsr
@@ -23,10 +23,13 @@ class CircularDaq:
         self.incomplete = False
         self.samples = []
 
+        self.data_buffer = [int32(0)]*(1024)
+        self.ts_buffer = [int64(0)]*(1024)
+        
         self.data_mask = 2**data_width-1
 
     @kernel
-    def configure(self, pretrigger, posttrigger):
+    def configure_rt(self, pretrigger, posttrigger):
         rtio_output((self.channel << 8) | 0, pretrigger)
         delay_mu(self.ref_period_mu)
         rtio_output((self.channel << 8) | 1, posttrigger)
@@ -34,29 +37,34 @@ class CircularDaq:
         self.pretrigger = pretrigger
         self.posttrigger = posttrigger
 
-    @rpc(flags={"async"})
-    def store_sample(self, sample):
-        data = sample & self.data_mask
-        trigger_cnt = sample >> self.data_width
-        self.samples.append((trigger_cnt, data))
+    @kernel
+    def get_samples(self, timeout=100*ms):
+        for idx in range(self.pretrigger+self.posttrigger):
+            up_to = now_mu() + self.core.seconds_to_mu(timeout)
+            timestamp, sample = rtio_input_timestamped_data(up_to, self.channel)
+            if timestamp >= 0:
+                self.data_buffer[idx] = sample
+                self.ts_buffer[idx] = timestamp
+            else:
+                return idx
+        return self.pretrigger+self.posttrigger
 
     @kernel
-    def get_samples(self):
-        self.incomplete = False
-        for _ in range(self.pretrigger+self.posttrigger):
-            timestamp, sample = rtio_input_timestamped_data(-1, self.channel)
-            # self.core.seconds_to_mu(10000*us)
-            if timestamp >= 0:
-                self.store_sample(sample)
-            else:
-                print(_)
-                raise ValueError("DAQ incomplete data")
+    def drain_channel(self):
+        diff = self.core.seconds_to_mu(1*ms)
+        ts, data = rtio_input_timestamped_data(now_mu()+diff, int32(self.channel))
+        return ts
 
     @kernel
     def clear_fifo(self):
         ts = 0
+        
+        self.core.break_realtime()
         while ts >= 0:
-            ts, data = rtio_input_timestamped_data(int64(100), int32(self.channel))
+            try:
+                ts = self.drain_channel()
+            except RTIOOverflow:
+                pass
 
     @kernel
     def trigger(self):
