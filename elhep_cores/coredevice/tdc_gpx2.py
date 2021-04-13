@@ -56,8 +56,6 @@ class TDCGPX2:
         self.div = self.spi.frequency_to_div(spi_freq)
         self.phy = [dmgr.get(f"{phy_csr_prefix}{i}") for i in range(4)]
 
-        
-
         # self.regs = [
         #     ( 0, 0b11011111),  # All pins but DISABLE are enabled
         #     ( 1, 0b00001111),  # High res off, combine: independent channels, HIT_ENA on
@@ -213,6 +211,10 @@ class TDCGPX2:
                 raise ValueError("TDC GPX-2: Invalid readout")
 
         delay(10*us)
+
+        # TODO: Someting strange happens when those lines are uncommented...
+        # for phy in self.phy:
+        #     phy.frame_length.set(22)
     
 
     
