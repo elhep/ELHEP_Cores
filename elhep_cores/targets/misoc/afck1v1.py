@@ -96,11 +96,14 @@ class BaseSoC(SoCSDRAM):
         SoCSDRAM.__init__(self, platform, 
                           clk_freq=125000000,
                           cpu_reset_address=cpu_reset_address,
+                          integrated_rom_size=integrated_rom_size,
                           **kwargs)
         if crg is None:
             self.submodules.crg = _CRG(platform)
         else:
             self.submodules.crg = crg(platform)
+
+        print(self.cpu_reset_address)
 
         # sdram
         self.submodules.ddrphy = k7ddrphy.K7DDRPHY(platform.request("ddram"))
@@ -112,6 +115,7 @@ class BaseSoC(SoCSDRAM):
         self.csr_devices += ["ddrphy"]
         self.flash_boot_address = 0x880000
         if not self.integrated_rom_size:
+            print("Building with SPI Flash")
             spiflash_pads = platform.request("spiflash{}".format(spi_flash_type))
             spiflash_pads.clk = Signal()
             self.specials += Instance("STARTUPE2",
@@ -127,6 +131,8 @@ class BaseSoC(SoCSDRAM):
             self.register_rom(self.spiflash.bus, 16 * 1024 * 1024)
             self.csr_devices.append("spiflash")
             self.flash_boot_address = 0x880000
+        else:
+            print("Building with integrated ROM")
 
 # EthernetSoC ------------------------------------------------------------------------------------------
 
