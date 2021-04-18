@@ -7,50 +7,56 @@ from migen.genlib.cdc import BusSynchronizer, PulseSynchronizer
 from migen.fhdl import verilog
 from artiq.gateware.rtio import rtlink
 
-from functools import reduce
-from operator import and_, add
-
-from math import cos, sin, pi
-from scipy import signal
-import numpy as np
-
 
 class SignalBaselineAverage(Module):
-    def __init__(self, wsize=16, fs=100000000.0, cutoff=10000.0, trans_width=10000.0, numtaps=266):
-        """Signal baseline computation module
-
-        This is basically LPF designed with the given parameters.
+    def __init__(self, wsize=16, divider_power_of_two=8):
+        """Simple signal baseline averaging module
 
         Use `i` and `o` for connecting input and outpu data respectively.
 
         Args:
             wsize (int, optional): Width of the signal vector. Defaults to 16.
-            fs (float, optional): Sampling frequency in Hz. Defaults to 100000000.0.
-            cutoff (float, optional): Cutoff frequency in Hz. Defaults to 10000.0.
-            trans_width (float, optional): Width of transition from pass band to stop band in Hz. Defaults to 10000.0.
-            numtaps (int, optional): Size of the FIR filter. Defaults to 266.
+            divider_power_of_two (int, optional): Size of the averaging module. Defaults to 2**8.
         """
-        # Compute filter coefficients with SciPy
-        coef = signal.remez(numtaps, [0, cutoff, cutoff + trans_width, 0.5 * fs], [1, 0], Hz=fs)
+        self.i = Signal(wsize)
+        self.o = Signal(wsize)
 
-        self.coef = coef
-        self.wsize = wsize
-        self.i = Signal((self.wsize, True))
-        self.o = Signal((self.wsize, True))
+        out_reg = Signal(wsize + divider_power_of_two)
+        reg = Array(Signal(wsize) for a in range(2**divider_power_of_two + 1))
 
-        ###
+        for i in range(2**divider_power_of_two-1):
+            self.sync += [
+                reg[i+1].eq(reg[i]),
+            ]
 
-        muls = []
-        src = self.i
-        for c in self.coef:
-            sreg = Signal((self.wsize, True))
-            self.sync += sreg.eq(src)
-            src = sreg
-            c_fp = int(c * 2 ** (self.wsize - 1))
-            muls.append(c_fp * sreg)
-        sum_full = Signal((2 * self.wsize - 1, True))
-        self.sync += sum_full.eq(reduce(add, muls))
-        self.comb += self.o.eq(sum_full >> self.wsize - 1)
+        self.sync += [
+            reg[0].eq(self.i),
+        ]
+
+        sum = 0
+        for i in range(2**divider_power_of_two):
+            sum = sum + reg[i] 
+
+        self.sync += [
+            out_reg.eq(sum),
+        ]
+
+        self.comb += [
+            self.o.eq(out_reg[len(out_reg) - wsize:len(out_reg)])
+        ]
 
 
 
+def testbench(dut):
+    yield dut.i.eq(1000)
+    for i in range(1000):
+        yield
+
+        
+if __name__ == "__main__":
+
+    dut = SignalBaselineAverage(16, 8)
+    run_simulation(dut, testbench(dut), vcd_name="SignalBaselineAverage.vcd")
+
+    dut = SignalBaselineAverage(16, 8)
+    print(verilog.convert(dut, {dut.i, dut.o}))
