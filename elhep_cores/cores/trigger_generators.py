@@ -1,11 +1,12 @@
 from migen import *
 from migen.genlib.io import DifferentialInput
-from migen.genlib.cdc import BusSynchronizer
+from migen.genlib.cdc import BusSynchronizer, PulseSynchronizer
 from artiq.gateware.rtio import rtlink
 from elhep_cores.cores.dsp.baseline import SignalBaseline
 from functools import reduce
 from operator import and_, add
 from elhep_cores.cores.rtlink_csr import RtLinkCSR
+from elhep_cores.cores.pulse_extender import PulseExtender
 
 
 def divide_chunks(l, n): 
@@ -159,4 +160,103 @@ class RtioTriggerGenerator(TriggerGenerator):
         self.sync.rio_phy += [
             self.trigger.eq(0),
             If(rtlink_iface.o.stb, self.trigger.eq(1))
+        ]
+
+
+class RtioCoincidenceTriggerGenerator(TriggerGenerator):
+
+    def __init__(self, name, generators, reset_pulse_length=50, pulse_max_length=255):
+        super().__init__(name)
+        assert pulse_max_length <= 31, "Pulse max length must be <= 31"
+        
+        self.pulse_length = Signal(max=pulse_max_length)
+        self.trigger = Signal()
+        self.register_trigger(self.trigger, "trigger", "rio_phy")
+        
+        self.trigger_in_signals = []
+        self.trigger_in_labels  = []
+
+        for generator in generators:
+            for trigger in generator.triggers:            
+                self._register_trigger_in(**trigger)
+
+        self._add_logic()
+        self._add_rtlink()        
+
+    def _register_trigger_in(self, signal, label, cd=None):
+        if len(self.trigger_in_signals >= 32):
+                raise RuntimeError("Coincidence Trigger currently supports up to 32 input channels.")
+        if cd is None:
+            trigger_in_rio_phy = signal
+        elif cd.name == "rio_phy":
+            trigger_in_rio_phy = signal
+        else:
+            trigger_in_rio_phy = Signal()
+            cdc = PulseSynchronizer(cd.name, "rio_phy")
+            self.submodules += cdc
+            self.comb += [
+                cdc.i.eq(signal),
+                trigger_in_rio_phy.eq(cdc.o)
+            ]        
+        self.trigger_in_signals.append(trigger_in_rio_phy)
+        self.trigger_in_labels.append(label)
+
+    def _add_logic(self):
+        self.pulses = []
+
+        for signal in self.trigger_in_signals:
+            pe = ClockDomainsRenamer("rio_phy")(PulseExtender(len(self.pulse_length)))
+            self.submodules += pe
+            self.comb += [
+                pe.i.eq(signal),
+                pe.length.eq(self.pulse_length)
+            ]
+            self.pulses.append(pe.o)
+        
+        self.mask = Signal(len(self.pulses))
+        self.enabled = Signal()
+
+        product_elements = [(self.pulses[i] | ~self.mask[i]) for i in range(len(self.pulses))]
+        product_elements.append(self.enabled)
+        product = reduce(and_, product_elements)
+
+        trigger_int = Signal()
+        trigger_int_d = Signal()
+        self.sync.rio_phy += [
+            self.trigger.eq(trigger_int & ~trigger_int_d),
+            trigger_int_d.eq(trigger_int),
+            trigger_int.eq(product)
+        ]
+
+    def _add_rtlink(self):
+        # Address [0]: wen
+        # Address [1:]: 0 - config, 1 - mask
+        self.rtlink = rtlink.Interface(
+            rtlink.OInterface(data_width=32, address_width=2),
+            rtlink.IInterface(data_width=32, timestamped=False))
+
+        rtlink_address = Signal.like(self.rtlink.o.address)
+        rtlink_wen = Signal()
+        self.comb += [
+            rtlink_address.eq(self.rtlink.o.address[1:]),
+            rtlink_wen.eq(self.rtlink.o.address[0]),
+        ]
+
+        self.sync.rio_phy += [
+            self.rtlink.i.stb.eq(0),
+            If(self.rtlink.o.stb & rtlink_wen & rtlink_address == 0,
+                self.pulse_length.eq(self.rtlink.o.data[1:]),
+                self.enabled.eq(self.rtlink.o.data[0])
+            ).
+            Elif(self.rtlink.o.stb & rtlink_wen & rtlink_address == 1,
+                self.mask.eq(self.rtlink.o.data)
+            ).
+            Elif(self.rtlink.o.stb & ~rtlink_wen & rtlink_address == 0,
+                self.rtlink.i.data.eq(Cat(self.enabled, self.pulse_length)),
+                self.rtlink.i.stb.eq(1)
+            ).
+            Elif(self.rtlink.o.stb & ~rtlink_wen & rtlink_address == 1,
+                self.rtlink.i.data.eq(self.mask),
+                self.rtlink.i.stb.eq(1)
+            )
         ]
