@@ -167,7 +167,7 @@ class RtioCoincidenceTriggerGenerator(TriggerGenerator):
 
     def __init__(self, name, generators, reset_pulse_length=50, pulse_max_length=255):
         super().__init__(name)
-        assert pulse_max_length <= 31, "Pulse max length must be <= 31"
+        assert pulse_max_length <= 2**32-1
         
         self.pulse_length = Signal(max=pulse_max_length)
         self.trigger = Signal()
@@ -183,21 +183,25 @@ class RtioCoincidenceTriggerGenerator(TriggerGenerator):
         self._add_logic()
         self._add_rtlink()        
 
-    def _register_trigger_in(self, signal, label, cd=None):
-        if len(self.trigger_in_signals >= 32):
-                raise RuntimeError("Coincidence Trigger currently supports up to 32 input channels.")
-        if cd is None:
-            trigger_in_rio_phy = signal
-        elif cd.name == "rio_phy":
+    def _register_trigger_in(self, signal, label, cd="rio_phy"):
+        if isinstance(cd, str):
+            cd = cd
+        elif isinstance(cd, ClockDomain):
+            cd = cd.name
+        else:
+            raise ValueError("Invalid clock domain")
+
+        if cd == "rio_phy":
             trigger_in_rio_phy = signal
         else:
             trigger_in_rio_phy = Signal()
-            cdc = PulseSynchronizer(cd.name, "rio_phy")
+            cdc = PulseSynchronizer(cd, "rio_phy")
             self.submodules += cdc
             self.comb += [
                 cdc.i.eq(signal),
                 trigger_in_rio_phy.eq(cdc.o)
-            ]        
+            ]
+      
         self.trigger_in_signals.append(trigger_in_rio_phy)
         self.trigger_in_labels.append(label)
 
@@ -228,11 +232,23 @@ class RtioCoincidenceTriggerGenerator(TriggerGenerator):
             trigger_int.eq(product)
         ]
 
+    @staticmethod
+    def signal_to_array(signal, row_width=32):
+        rows_num = (len(signal)+(row_width-1))//row_width
+        rows = [signal[i*row_width:(i+1)*row_width] for i in range(rows_num)]
+        return Array(rows)  
+
     def _add_rtlink(self):
-        # Address [0]: wen
-        # Address [1:]: 0 - config, 1 - mask
+        # Address 0
+        #   0:0  - enabled
+        #   1:31 - pulse length
+        # Address 1: mask
+
+        mask_adr_no = (len(self.mask)+31)//32
+        adr_width = len(Signal(max=mask_adr_no+1))
+
         self.rtlink = rtlink.Interface(
-            rtlink.OInterface(data_width=32, address_width=2),
+            rtlink.OInterface(data_width=32, address_width=adr_width),
             rtlink.IInterface(data_width=32, timestamped=False))
 
         rtlink_address = Signal.like(self.rtlink.o.address)
@@ -242,21 +258,26 @@ class RtioCoincidenceTriggerGenerator(TriggerGenerator):
             rtlink_wen.eq(self.rtlink.o.address[0]),
         ]
 
+        mask_array = self.signal_to_array(self.mask)
+
         self.sync.rio_phy += [
             self.rtlink.i.stb.eq(0),
+            # Write
             If(self.rtlink.o.stb & rtlink_wen & rtlink_address == 0,
                 self.pulse_length.eq(self.rtlink.o.data[1:]),
                 self.enabled.eq(self.rtlink.o.data[0])
             ).
-            Elif(self.rtlink.o.stb & rtlink_wen & rtlink_address == 1,
-                self.mask.eq(self.rtlink.o.data)
+            Elif(self.rtlink.o.stb & rtlink_wen & rtlink_address >= 1,
+                mask_array[rtlink_address-1].eq(self.rtlink.o.data)
             ).
+
+            # Readout
             Elif(self.rtlink.o.stb & ~rtlink_wen & rtlink_address == 0,
                 self.rtlink.i.data.eq(Cat(self.enabled, self.pulse_length)),
                 self.rtlink.i.stb.eq(1)
             ).
-            Elif(self.rtlink.o.stb & ~rtlink_wen & rtlink_address == 1,
-                self.rtlink.i.data.eq(self.mask),
+            Elif(self.rtlink.o.stb & ~rtlink_wen & rtlink_address >= 1,
+                self.rtlink.i.data.eq(mask_array[rtlink_address-1]),
                 self.rtlink.i.stb.eq(1)
             )
         ]
