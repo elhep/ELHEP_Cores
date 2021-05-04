@@ -28,18 +28,10 @@ class CircularDAQ(Module):
     No readout is implemented. 
     """
 
-    def __init__(self, data_i, stb_i, trigger_rio_phy, trigger_reset_rio_phy=None, 
-        circular_buffer_length=128, trigger_cnt_len=4):
+    def __init__(self, data_i, stb_i, trigger_dclk, circular_buffer_length=128):
 
         data_width = len(data_i)
-        assert data_width <= 32-trigger_cnt_len
-        if trigger_reset_rio_phy is None:
-            trigger_reset_dclk = Signal(reset=0)
-        else:
-            self.trigger_reset_dclk = trigger_reset_dclk = Signal()
-            cdc = PulseSynchronizer("rio_phy", "dclk")
-            self.submodules += cdc
-            self.comb += [cdc.i.eq(trigger_reset_rio_phy), trigger_reset_dclk.eq(cdc.o)]
+        assert data_width <= 32, f"Data width ({data_width}) must be <= 32"
         
         pretrigger_rio_phy = Signal(max=circular_buffer_length)
         posttrigger_rio_phy = Signal.like(pretrigger_rio_phy)
@@ -49,8 +41,8 @@ class CircularDAQ(Module):
 
         # Interface - rtlink
         self.rtlink = rtlink_iface = rtlink.Interface(
-            rtlink.OInterface(data_width=len(pretrigger_rio_phy), address_width=2),
-            rtlink.IInterface(data_width=data_width+trigger_cnt_len, timestamped=True))
+            rtlink.OInterface(data_width=len(pretrigger_rio_phy), address_width=1),
+            rtlink.IInterface(data_width=data_width, timestamped=True))
 
         self.sw_trigger = sw_trigger = Signal()
         self.sync.rio_phy += [
@@ -58,24 +50,11 @@ class CircularDAQ(Module):
             If(rtlink_iface.o.stb,
                If(self.rtlink.o.address == 0, pretrigger_rio_phy.eq(rtlink_iface.o.data)),
                If(self.rtlink.o.address == 1, posttrigger_rio_phy.eq(rtlink_iface.o.data)),
-               If(self.rtlink.o.address == 2, sw_trigger.eq(1)),
-            )
-        ]
-
-        trigger_cnt = Signal(trigger_cnt_len, reset=0)
-        trigger_d = Signal()
-
-        self.sync.dclk += [
-            If(trigger_reset_dclk == 1, trigger_cnt.eq(0)).Else(
-                If(trigger_dclk & ~trigger_d,  # detect trigger re
-                    trigger_cnt.eq(trigger_cnt+1)),
-                trigger_d.eq(trigger_dclk)
             )
         ]
 
         # Data format (MSb first):
-        # <tdc_data, 22b>
-        # <data valid, 1b>
+        # <data, Nb> <data valid, 1b>
 
         cb_data_in = Signal(data_width+1)
         self.comb += [
@@ -83,7 +62,7 @@ class CircularDAQ(Module):
         ]
 
         circular_buffer = ClockDomainsRenamer({"sys": "dclk"})(TriggeredCircularBuffer(len(cb_data_in), circular_buffer_length))
-        async_fifo = ClockDomainsRenamer({"write": "dclk", "read": "rio_phy"})(AsyncFIFOBuffered(data_width+trigger_cnt_len+1, 16))
+        async_fifo = ClockDomainsRenamer({"write": "dclk", "read": "rio_phy"})(AsyncFIFOBuffered(data_width+1, 16))
         trigger_cdc = PulseSynchronizer("rio_phy", "dclk")
         pretrigger_cdc = MultiReg(pretrigger_rio_phy, pretrigger_dclk, "dclk")
         posttrigger_cdc = MultiReg(posttrigger_rio_phy, posttrigger_dclk, "dclk")
@@ -91,22 +70,22 @@ class CircularDAQ(Module):
         self.specials += [pretrigger_cdc, posttrigger_cdc]
 
         self.comb += [
-            trigger_cdc.i.eq(trigger_rio_phy | sw_trigger),
-            trigger_dclk.eq(trigger_cdc.o & ~trigger_reset_dclk),
             circular_buffer.data_in.eq(cb_data_in),
             circular_buffer.we.eq(1),
             circular_buffer.trigger.eq(trigger_dclk),
             circular_buffer.pretrigger.eq(pretrigger_dclk),
             circular_buffer.posttrigger.eq(posttrigger_dclk),
-            async_fifo.din.eq(Cat(circular_buffer.data_out, trigger_cnt)),
+            async_fifo.din.eq(circular_buffer.data_out),
             async_fifo.re.eq(async_fifo.readable),
             async_fifo.we.eq(circular_buffer.stb_out),
-            rtlink_iface.i.data.eq(async_fifo.dout[1:]),  # two LSb are data valid (TDC frame)
-            rtlink_iface.i.stb.eq(reduce(and_, [async_fifo.dout[0], async_fifo.readable]))  # stb if there are data and frame
+            rtlink_iface.i.data.eq(async_fifo.dout[1:]),
+            rtlink_iface.i.stb.eq(reduce(and_, [async_fifo.dout[0], async_fifo.readable]))  # stb if there is data and frame
         ]
 
 
 class SimulationWrapper(Module):
+
+    # TODO: Update simulation
 
     def __init__(self):
 
