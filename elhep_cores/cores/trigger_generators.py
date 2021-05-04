@@ -233,6 +233,12 @@ class RtioCoincidenceTriggerGenerator(TriggerGenerator):
         ]
 
     @staticmethod
+    def list_to_chunks(l, s):
+        chunk_num = (len(l)+(s-1))//s
+        chunks = [l[i*s:(i+1)*s] for i in range(chunk_num)]
+        return chunks
+
+    @staticmethod
     def signal_to_array(signal, row_width=32):
         rows_num = (len(signal)+(row_width-1))//row_width
         rows = [signal[i*row_width:(i+1)*row_width] for i in range(rows_num)]
@@ -281,3 +287,6 @@ class RtioCoincidenceTriggerGenerator(TriggerGenerator):
                 self.rtlink.i.stb.eq(1)
             )
         ]
+
+    def get_mask_mapping(self):
+        return self.list_to_chunks(self.trigger_in_labels, 32)
