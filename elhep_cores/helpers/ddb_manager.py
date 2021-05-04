@@ -3,24 +3,22 @@ import json
 import os
 
 
-class DdbManager:
+class HasDdbManager:
 
-    def __init__(self, core_addr, output_dir, ref_period=1e-9):
-        self.rtio_channels = []
-        self.rtio_labels = []
-        self.device_ids = []
-        self.coredevices = OrderedDict()
-        self.core_addr = core_addr
-        self.ref_period = ref_period
+    rtio_channels = []
+    rtio_labels = []
+    device_ids = []
+    coredevices = OrderedDict()
 
-    def add_rtio_channels(self, channel, device_id, channel_idx_arg="channel", **kwargs):
-        channel_idx = len(self.rtio_channels)
+    @classmethod
+    def add_rtio_channels(cls, channel, device_id, channel_idx_arg="channel", **kwargs):
+        channel_idx = len(cls.rtio_channels)
         if isinstance(channel, list):
-            self.rtio_channels += channel
-            self.rtio_labels += [device_id]*len(channel)
+            cls.rtio_channels += channel
+            cls.rtio_labels += [device_id]*len(channel)
         else:
-            self.rtio_channels.append(channel)
-            self.rtio_labels.append(device_id)
+            cls.rtio_channels.append(channel)
+            cls.rtio_labels.append(device_id)
         
         if "module" in kwargs:
             if "class_name" not in kwargs:
@@ -29,19 +27,21 @@ class DdbManager:
             class_name = kwargs.get("class_name")
             arguments = kwargs.get("arguments", {})
             arguments[channel_idx_arg] = channel_idx
-            self.register_coredevice(device_id, module, class_name, arguments)
-        self.device_ids.append(device_id)
-        
-    def register_coredevice(self, device_id, module, class_name, arguments=None):
-        coredevice = self._local_device(module, class_name, arguments)
-        self.coredevices[device_id] = coredevice
+            cls.register_coredevice(device_id, module, class_name, arguments)
+        cls.device_ids.append(device_id)
+    
+    @classmethod
+    def register_coredevice(cls, device_id, module, class_name, arguments=None):
+        coredevice = cls._local_device(module, class_name, arguments)
+        cls.coredevices[device_id] = coredevice
 
-    def print_design_info(self):
+    @classmethod
+    def print_design_info(cls):
         print("RTIO Channels:")
         print("="*80)
-        for idx, (label, device_id) in enumerate(zip(self.rtio_labels, self.device_ids)):
+        for idx, (label, device_id) in enumerate(zip(cls.rtio_labels, cls.device_ids)):
             if device_id:
-                class_name = self.coredevices[device_id]['class']
+                class_name = cls.coredevices[device_id]['class']
                 print(f"{idx:3d}: {label} -> {device_id}({class_name})")
             else:
                 print(f"{idx:3d}: {label}")
@@ -66,30 +66,33 @@ class DdbManager:
             ("command", command)
         ])
 
-    def store_ddb(self, output_dir):
+    @classmethod
+    def store_ddb(cls, core_addr, output_dir, ref_period=1e-9):
         device_db = OrderedDict([
-            ("core", self._local_device(
+            ("core", cls._local_device(
                 module="artiq.coredevice.core",
                 class_name="Core",
                 arguments={
-                    "host": self.core_addr,
-                    "ref_period": self.ref_period
+                    "host": core_addr,
+                    "ref_period": ref_period
                 }
             )),
-            ("core_cache", self._local_device(
+            ("core_cache", cls._local_device(
                 module="artiq.coredevice.cache",
                 class_name="CoreCache"
             )),
-            ("code_dma", self._local_device(
+            ("code_dma", cls._local_device(
                 module="artiq.coredevice.dma",
                 class_name="CoreDMA"
             )),
-            *(list(self.coredevices.items()))
+            *(list(cls.coredevices.items()))
         ])
+
+        ddb_content = json.dumps(device_db, indent=4)
 
         if not os.path.exists(output_dir):
             os.mkdir(output_dir)
         
         with open(os.path.join(output_dir, "device_db.py"), "w") as f:
-            json.dump(device_db, f, indent=4)
+            f.write("device_db = {}\n".format(ddb_content))
     
