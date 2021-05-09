@@ -6,6 +6,32 @@ from elhep_cores.coredevice.rtlink_csr import RtlinkCsr
 import json
 
 
+class RtioBaselineTriggerGenerator:
+
+    def __init__(self, dmgr, channel):
+        self.identifier = f"{prefix}_baseline_tg"
+        self.index = index
+
+    @property
+    def rising_edge(self):
+        return self.identifier + "_re"
+
+    @property
+    def falling_edge(self):
+        return self.identifier + "_fe"
+
+class RtioCoincidenceTriggerGenerator:
+
+    def __init__(self, dmgr, mask_mapping, channel, identifier, 
+            core_device="core"):
+        self.identifier = identifier
+        self.mask_mapping = mask_mapping
+        self.channel = channel
+
+    @property
+    def trigger(self):
+        return self.identifier
+
 class TriggerGenerator:
     
     kernel_invariants = ["layout"]

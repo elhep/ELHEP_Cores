@@ -251,7 +251,7 @@ class RtioCoincidenceTriggerGenerator(TriggerGenerator):
         # Address 1: mask
 
         mask_adr_no = (len(self.mask)+31)//32
-        adr_width = len(Signal(max=mask_adr_no+1))
+        adr_width = len(Signal(max=mask_adr_no+1))+1
 
         self.rtlink = rtlink.Interface(
             rtlink.OInterface(data_width=32, address_width=adr_width),
