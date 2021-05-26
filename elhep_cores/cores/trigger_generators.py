@@ -169,7 +169,7 @@ class RtioTriggerGenerator(TriggerGenerator, HasDdbManager):
             self.add_rtio_channels(
                 channel=Channel.from_phy(self), 
                 device_id=identifier,
-                module="elhep_cores.coredevice.trigger_generator",
+                module="elhep_cores.coredevice.trigger_generators",
                 class_name="RtioTriggerGenerator")
 
 

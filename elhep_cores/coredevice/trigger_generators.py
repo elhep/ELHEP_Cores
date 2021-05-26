@@ -91,15 +91,11 @@ class RtioCoincidenceTriggerGenerator:
 
     @kernel
     def enable_source(self, adr, idx):
-        print(adr, idx)
         self.core.break_realtime()
         rtio_output(self.channel << 8 | (adr+2) << 1 | 0, 0)
         delay_mu(8)
         value = rtio_input_data(self.channel)
-        print("old", value)
         delay_mu(10000)
         value |= (1 << idx)
-        print("new", value)
-        self.core.break_realtime()
         rtio_output(self.channel << 8 | (adr+2) << 1 | 1, value)
         delay_mu(8)       

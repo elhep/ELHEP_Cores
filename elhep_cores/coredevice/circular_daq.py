@@ -33,39 +33,35 @@ class CircularDaq:
 
     @rpc(flags={"async"})
     def store(self, samples):
-        pass
+        raise NotImplementedError
 
     @kernel
     def transfer_samples(self, chunk=200):
-        start = self.buffer_ptr
-        for i in range(chunk):
+        idx = 0
+        while True:
             timestamp, sample = \
-                rtio_input_timestamped_data(now_mu(), self.channel)
+                rtio_input_timestamped_data(self.core.get_rtio_counter_mu(), self.channel)
             if timestamp < 0:
                 break
-            self.data_buffer[self.buffer_ptr] = sample
-            self.ts_buffer[self.buffer_ptr] = timestamp
-            self.buffer_ptr = (self.buffer_ptr + 1) % self.buffer_len
-        if start+i >= self.buffer_len:
-            self.store(
-                self.buffer[start:] + 
-                self.buffer[:i+start-self.buffer_len-1]
-            )
-        else:
-            self.store(self.buffer[start:start+i])
+            self.data_buffer[idx] = sample
+            idx += 1
+        if idx:
+            self.store(self.data_buffer[:idx])
         
     @kernel
     def drain_channel(self):
-        diff = self.core.seconds_to_mu(1*ms)
-        ts, data = rtio_input_timestamped_data(now_mu()+diff, int32(self.channel))
+        ts, data = rtio_input_timestamped_data(self.core.get_rtio_counter_mu(), int32(self.channel))
         return ts
 
     @kernel
     def clear_fifo(self):
-        ts = 0     
-        self.core.break_realtime()
+        ts = 0
+        count = 0 
         while ts >= 0:
             try:
                 ts = self.drain_channel()
+                count += 1
             except RTIOOverflow:
                 pass
+        print("Cleared:", count)
+        
