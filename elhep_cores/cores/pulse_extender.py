@@ -12,6 +12,7 @@ class PulseExtender(Module):
     def __init__(self, pulse_max_length=255):
         self.i = Signal()
         self.o = Signal()
+        self.rst = Signal()
         self.length = Signal(max=pulse_max_length)
 
         # # #
@@ -30,5 +31,6 @@ class PulseExtender(Module):
             If(re, NextState("PULSE")))
         fsm.act("PULSE",
             self.o.eq(1),
-            If(counter == 0, NextState("IDLE")).Else(NextValue(counter, counter-1)))
+            If(counter == 0, NextState("IDLE")).Else(NextValue(counter, counter-1)),
+            If(self.rst, NextState("IDLE")))
         self.submodules += fsm

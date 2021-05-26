@@ -28,25 +28,26 @@ class CircularDAQ(Module):
     No readout is implemented. 
     """
 
-    def __init__(self, data_i, stb_i, trigger_dclk, circular_buffer_length=128):
+    def __init__(self, data_i, stb_i, trigger_dclk, trigger_id_dclk=None, 
+            circular_buffer_length=128):
 
         data_width = len(data_i)
         assert data_width <= 32, f"Data width ({data_width}) must be <= 32"
-        
+
+        self.data_i = data_i        
         pretrigger_rio_phy = Signal(max=circular_buffer_length)
         posttrigger_rio_phy = Signal.like(pretrigger_rio_phy)
         self.pretrigger_dclk = pretrigger_dclk = Signal.like(pretrigger_rio_phy)
         self.posttrigger_dclk = posttrigger_dclk = Signal.like(posttrigger_rio_phy)
-        self.trigger_dclk = trigger_dclk = Signal()
+        self.trigger_dclk = trigger_dclk
+        self.trigger_id_dclk = trigger_id_dclk
 
         # Interface - rtlink
         self.rtlink = rtlink_iface = rtlink.Interface(
             rtlink.OInterface(data_width=len(pretrigger_rio_phy), address_width=1),
             rtlink.IInterface(data_width=data_width, timestamped=True))
 
-        self.sw_trigger = sw_trigger = Signal()
         self.sync.rio_phy += [
-            sw_trigger.eq(0),
             If(rtlink_iface.o.stb,
                If(self.rtlink.o.address == 0, pretrigger_rio_phy.eq(rtlink_iface.o.data)),
                If(self.rtlink.o.address == 1, posttrigger_rio_phy.eq(rtlink_iface.o.data)),
@@ -66,6 +67,7 @@ class CircularDAQ(Module):
         trigger_cdc = PulseSynchronizer("rio_phy", "dclk")
         pretrigger_cdc = MultiReg(pretrigger_rio_phy, pretrigger_dclk, "dclk")
         posttrigger_cdc = MultiReg(posttrigger_rio_phy, posttrigger_dclk, "dclk")
+        self.cbuf = circular_buffer
         self.submodules += [circular_buffer, async_fifo, trigger_cdc]
         self.specials += [pretrigger_cdc, posttrigger_cdc]
 
@@ -73,6 +75,7 @@ class CircularDAQ(Module):
             circular_buffer.data_in.eq(cb_data_in),
             circular_buffer.we.eq(1),
             circular_buffer.trigger.eq(trigger_dclk),
+            circular_buffer.trigger_id.eq(trigger_id_dclk),
             circular_buffer.pretrigger.eq(pretrigger_dclk),
             circular_buffer.posttrigger.eq(posttrigger_dclk),
             async_fifo.din.eq(circular_buffer.data_out),

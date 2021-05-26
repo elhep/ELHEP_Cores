@@ -6,43 +6,54 @@ import csv
 
 class RtLinkIface:
 
-    def __init__(self, rio_phy_clock, stb_i, data_i, address_i=None, stb_o=None, data_o=None, debug=False):
+    def __init__(self, rio_phy_clock, stb_o, data_o, address_o=None, 
+            stb_i=None, data_i=None, debug=False):
         self.rio_phy_clk = rio_phy_clock
-
         self.stb_i = stb_i
         self.data_i = data_i
-        self.address_i = address_i
-
+        self.address_o = address_o
         self.stb_o = stb_o
         self.data_o = data_o
+        self.debug = debug
 
         self.clear_interface()
 
-        self.debug = debug
+    @classmethod
+    def get_iface_by_prefix(cls, dut, prefix, rio_phy_clk="rio_phy_clk", 
+            debug=False):
+        params = {
+            "rio_phy_clock": getattr(dut, rio_phy_clk),
+            "stb_i": getattr(dut, f"{prefix}_i_stb", None),
+            "data_i": getattr(dut, f"{prefix}_i_data", None),
+            "address_o": getattr(dut, f"{prefix}_o_address", None),
+            "stb_o": getattr(dut, f"{prefix}_o_stb"),
+            "data_o": getattr(dut, f"{prefix}_o_data")
+        }
+        return cls(**params, debug=debug)
 
     def clear_interface(self):
-        self.stb_i <= 0
-        self.data_i <= 0
-        if self.address_i:
-            self.address_i <= 0
+        self.stb_o <= 0
+        self.data_o <= 0
+        if self.address_o:
+            self.address_o <= 0
 
     async def write(self, data, address=None):
         if self.debug: print(f"rtlink write {data:x} >> {address}")
         await FallingEdge(self.rio_phy_clk)
-        self.stb_i <= 1
-        if self.address_i:
+        self.stb_o <= 1
+        if self.address_o:
             if address is None:
-                raise ValueError("Address required for RtLink")
-            self.address_i <= address
-        self.data_i <= data
+                raise ValueError("Address required for RtLink output")
+            self.address_o <= address
+        self.data_o <= data
         await FallingEdge(self.rio_phy_clk)
         self.clear_interface()
 
     async def read(self, timeout=None):
         while True:
             await RisingEdge(self.rio_phy_clk)
-            if self.stb_o == 1:
-                return self.data_o
+            if self.stb_i == 1:
+                return self.data_i
             if timeout is None:
                 continue
             timeout -= 1
@@ -67,11 +78,13 @@ class RtLinkCSR:
             yield self.rtlink.write(0, self.address << 1 | 0)
             return (yield self.rtlink.read())
 
-    def __init__(self, definition_file_path, rio_phy_clock, stb_i, data_i, address_i, stb_o, data_o):
+    def __init__(self, definition_file_path, rio_phy_clock, stb_i, data_i, 
+            address_i, stb_o, data_o):
         with open(definition_file_path, 'r') as f:
             regs = list(csv.reader(f, delimiter=','))[1:]
 
-        rtlink = RtLinkIface(rio_phy_clock, stb_i, data_i, address_i, stb_o, data_o)
+        rtlink = RtLinkIface(rio_phy_clock, stb_i, data_i, address_i, stb_o, 
+            data_o)
 
         for r in regs:
             name = r[1].strip()

@@ -7,6 +7,8 @@ import csv
 
 class RtlinkCsr:
 
+    kernel_invariants = {"channel", "regs", "ref_period_mu", "regs"}
+
     class Reg:
 
         def __init__(self, channel, address, length, core):
@@ -41,6 +43,7 @@ class RtlinkCsr:
         self.core = dmgr.get(core_device)
         self.ref_period_mu = self.core.seconds_to_mu(
             self.core.coarse_ref_period)
+        self.regs = {}
 
         for address, reg in enumerate(regs):
             new_reg = RtlinkCsr.Reg(
@@ -49,4 +52,4 @@ class RtlinkCsr:
                 length=reg[1],
                 core=self.core)
             setattr(self, reg[0], new_reg)
-        
+            self.regs[reg[0]] = new_reg

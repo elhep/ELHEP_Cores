@@ -9,10 +9,12 @@ class HasDdbManager:
     rtio_labels = []
     device_ids = []
     coredevices = OrderedDict()
+    rtio_channels_dict = {}
 
     @classmethod
     def add_rtio_channels(cls, channel, device_id, channel_idx_arg="channel", **kwargs):
         channel_idx = len(cls.rtio_channels)
+        cls.rtio_channels_dict["device_id"] = channel_idx
         if isinstance(channel, list):
             cls.rtio_channels += channel
             cls.rtio_labels += [device_id]*len(channel)
