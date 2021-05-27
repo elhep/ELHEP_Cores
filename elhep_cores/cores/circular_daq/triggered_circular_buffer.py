@@ -23,7 +23,8 @@ class TriggeredCircularBuffer(Module):
         # trigger_id will be optimized out if not required
         self.trigger_id = Signal(max(trigger_id_width,1))
 
-        self.data_out = Signal(data_width)
+        # Trigger ID will be embedded into output data
+        self.data_out = Signal(data_width+trigger_id_width)
         self.stb_out = Signal()   
 
         # # #

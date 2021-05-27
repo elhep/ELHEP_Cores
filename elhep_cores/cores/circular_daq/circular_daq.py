@@ -31,21 +31,20 @@ class CircularDAQ(Module):
     def __init__(self, data_i, stb_i, trigger_dclk, trigger_id_dclk=None, 
             circular_buffer_length=128):
 
-        data_width = len(data_i)
-        assert data_width <= 32, f"Data width ({data_width}) must be <= 32"
+        iiface_width = len(data_i) + len(trigger_id_dclk)
+        assert iiface_width <= 32, f"Data width summarized with trigger " \
+            "ID width ({iiface_width}) must be <= 32"
 
         self.data_i = data_i        
         pretrigger_rio_phy = Signal(max=circular_buffer_length)
         posttrigger_rio_phy = Signal.like(pretrigger_rio_phy)
-        self.pretrigger_dclk = pretrigger_dclk = Signal.like(pretrigger_rio_phy)
-        self.posttrigger_dclk = posttrigger_dclk = Signal.like(posttrigger_rio_phy)
-        self.trigger_dclk = trigger_dclk
-        self.trigger_id_dclk = trigger_id_dclk
-
+        pretrigger_dclk = Signal.like(pretrigger_rio_phy)
+        posttrigger_dclk = Signal.like(posttrigger_rio_phy)
+        
         # Interface - rtlink
         self.rtlink = rtlink_iface = rtlink.Interface(
             rtlink.OInterface(data_width=len(pretrigger_rio_phy), address_width=1),
-            rtlink.IInterface(data_width=data_width, timestamped=True))
+            rtlink.IInterface(data_width=iiface_width, timestamped=False))
 
         self.sync.rio_phy += [
             If(rtlink_iface.o.stb,
@@ -54,20 +53,28 @@ class CircularDAQ(Module):
             )
         ]
 
-        # Data format (MSb first):
-        # <data, Nb> <data valid, 1b>
-
-        cb_data_in = Signal(data_width+1)
+        # We're embedding stb into data stream going into the cyclic buffer
+        cb_data_in = Signal(len(data_i)+1)
         self.comb += [
             cb_data_in.eq(Cat(stb_i, data_i))
         ]
 
-        circular_buffer = ClockDomainsRenamer({"sys": "dclk"})(TriggeredCircularBuffer(len(cb_data_in), circular_buffer_length))
-        async_fifo = ClockDomainsRenamer({"write": "dclk", "read": "rio_phy"})(AsyncFIFOBuffered(data_width+1, 16))
+        self.cbuf = circular_buffer = ClockDomainsRenamer({"sys": "dclk"})(
+            TriggeredCircularBuffer(
+                data_width=len(cb_data_in),
+                trigger_id_width=len(trigger_id_dclk),
+                length=circular_buffer_length
+            )
+        )
+        async_fifo = ClockDomainsRenamer({"write": "dclk", "read": "rio_phy"})(     
+            AsyncFIFOBuffered(
+                width=len(circular_buffer.data_out), 
+                depth=16
+            )
+        )
         trigger_cdc = PulseSynchronizer("rio_phy", "dclk")
         pretrigger_cdc = MultiReg(pretrigger_rio_phy, pretrigger_dclk, "dclk")
         posttrigger_cdc = MultiReg(posttrigger_rio_phy, posttrigger_dclk, "dclk")
-        self.cbuf = circular_buffer
         self.submodules += [circular_buffer, async_fifo, trigger_cdc]
         self.specials += [pretrigger_cdc, posttrigger_cdc]
 
@@ -82,7 +89,7 @@ class CircularDAQ(Module):
             async_fifo.re.eq(async_fifo.readable),
             async_fifo.we.eq(circular_buffer.stb_out),
             rtlink_iface.i.data.eq(async_fifo.dout[1:]),
-            rtlink_iface.i.stb.eq(reduce(and_, [async_fifo.dout[0], async_fifo.readable]))  # stb if there is data and frame
+            rtlink_iface.i.stb.eq(async_fifo.dout[0] & async_fifo.readable)  # stb if there is data and frame
         ]
 
 
