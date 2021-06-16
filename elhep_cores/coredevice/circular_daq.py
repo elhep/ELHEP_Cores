@@ -11,22 +11,18 @@ from numpy import int64, int32
 
 class CircularDaq:
 
-    def __init__(self, dmgr, channel, data_width, trigger_cnt_width, core_device="core"):
+    kernel_invariants = {"channel", "core", "ref_period_mu", "buffer_len"}
+
+    def __init__(self, dmgr, channel, buffer_len=1024, core_device="core"):
         self.channel = channel
         self.core = dmgr.get(core_device)
         self.ref_period_mu = self.core.seconds_to_mu(
             self.core.coarse_ref_period)
-        self.pretrigger = 100
-        self.posttrigger = 100
-        self.data_width = data_width
-        self.trigger_cnt_width = trigger_cnt_width
-        self.incomplete = False
-        self.samples = []
-
-        self.data_buffer = [int32(0)]*(1024)
-        self.ts_buffer = [int64(0)]*(1024)
         
-        self.data_mask = 2**data_width-1
+        self.buffer_len = buffer_len
+        self.data_buffer = [int32(0)]*(buffer_len)
+        self.ts_buffer = [int64(0)]*(buffer_len)
+        self.buffer_ptr = 0
 
     @kernel
     def configure_rt(self, pretrigger, posttrigger):
@@ -34,39 +30,38 @@ class CircularDaq:
         delay_mu(self.ref_period_mu)
         rtio_output((self.channel << 8) | 1, posttrigger)
         delay_mu(self.ref_period_mu)
-        self.pretrigger = pretrigger
-        self.posttrigger = posttrigger
+
+    @rpc(flags={"async"})
+    def store(self, samples):
+        raise NotImplementedError
 
     @kernel
-    def get_samples(self, timeout=100*ms):
-        for idx in range(self.pretrigger+self.posttrigger):
-            up_to = now_mu() + self.core.seconds_to_mu(timeout)
-            timestamp, sample = rtio_input_timestamped_data(up_to, self.channel)
-            if timestamp >= 0:
-                self.data_buffer[idx] = sample
-                self.ts_buffer[idx] = timestamp
-            else:
-                return idx
-        return self.pretrigger+self.posttrigger
-
+    def transfer_samples(self, chunk=200):
+        idx = 0
+        while True:
+            timestamp, sample = \
+                rtio_input_timestamped_data(self.core.get_rtio_counter_mu(), self.channel)
+            if timestamp < 0:
+                break
+            self.data_buffer[idx] = sample
+            idx += 1
+        if idx:
+            self.store(self.data_buffer[:idx])
+        
     @kernel
     def drain_channel(self):
-        diff = self.core.seconds_to_mu(1*ms)
-        ts, data = rtio_input_timestamped_data(now_mu()+diff, int32(self.channel))
+        ts, data = rtio_input_timestamped_data(self.core.get_rtio_counter_mu(), int32(self.channel))
         return ts
 
     @kernel
     def clear_fifo(self):
         ts = 0
-        
-        self.core.break_realtime()
+        count = 0 
         while ts >= 0:
             try:
                 ts = self.drain_channel()
+                count += 1
             except RTIOOverflow:
                 pass
-
-    @kernel
-    def trigger(self):
-        rtio_output((self.channel << 8) | 2, 1)
-        delay_mu(self.ref_period_mu)
+        print("Cleared:", count)
+        

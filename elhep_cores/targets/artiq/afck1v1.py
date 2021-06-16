@@ -12,7 +12,6 @@ from migen.build.generic_platform import *
 from misoc.interconnect.csr import *
 from misoc.cores import gpio
 from misoc.cores.a7_gtp import *
-from elhep_cores.targets.misoc.afck1v1 import MiniSoC, BaseSoC, soc_afck1v1_argdict, soc_afck1v1_args
 from misoc.integration.soc_sdram import soc_sdram_argdict
 from misoc.integration.builder import builder_args, builder_argdict
 
@@ -21,7 +20,8 @@ from artiq.gateware import rtio
 from artiq.build_soc import build_artiq_soc, add_identifier
 from artiq.gateware.rtio.phy.ttl_simple import Output
 
-from elhep_cores.helpers.ddb_manager import DdbManager
+from elhep_cores.helpers.ddb_manager import HasDdbManager
+from elhep_cores.targets.misoc.afck1v1 import MiniSoC, BaseSoC, soc_afck1v1_argdict, soc_afck1v1_args
 
 iostd_single = {
     "fmc1_LA": [IOStandard("LVCMOS25")],
@@ -112,7 +112,6 @@ class CRG(Module):
         platform.add_period_constraint(self.cd_rtiox4.clk, 2.)
 
 
-
 def fix_serdes_timing_path(platform):
     # ignore timing of path from OSERDESE2 through the pad to ISERDESE2
     platform.add_platform_command(
@@ -124,15 +123,7 @@ def fix_serdes_timing_path(platform):
     )
 
 
-class TestMod(Module, AutoCSR):
-
-    def __init__(self):
-        self.ledg = CSRStorage(size=1)
-        self.ledb = CSRStorage(size=1)
-        self.dummy = CSRStorage(size=55)
-
-
-class StandaloneBase(MiniSoC, AMPSoC, DdbManager):
+class StandaloneBase(MiniSoC, AMPSoC, HasDdbManager):
     mem_map = {
         "cri_con":       0x10000000,
         "rtio":          0x20000000,
@@ -152,7 +143,6 @@ class StandaloneBase(MiniSoC, AMPSoC, DdbManager):
                          crg=CRG,
                          **kwargs)
         AMPSoC.__init__(self)
-        DdbManager.__init__(self, "192.168.3.203", output_dir)
         add_identifier(self)
         self.output_dir = output_dir
         
@@ -167,9 +157,8 @@ class StandaloneBase(MiniSoC, AMPSoC, DdbManager):
         # sda_signal = Cat([bus[1] for bus in self.i2c_buses])
         # self.submodules.i2c = gpio.GPIOTristate([scl_signal, sda_signal])
         
-
         self.print_design_info()
-        self.store_ddb(output_dir)
+        self.store_ddb("192.168.95.203", output_dir)
 
         self.config["I2C_BUS_COUNT"] = 1  # len(self.i2c_buses)
         self.config["RTIO_FREQUENCY"] = "125.0"

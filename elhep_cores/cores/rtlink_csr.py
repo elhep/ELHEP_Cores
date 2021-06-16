@@ -2,9 +2,11 @@ import os
 
 from migen import *
 from artiq.gateware.rtio import rtlink
+from artiq.gateware.rtio.channel import Channel
+from elhep_cores.helpers.ddb_manager import HasDdbManager
 
 
-class RtLinkCSR(Module):
+class RtLinkCSR(Module, HasDdbManager):
 
     """
     regs:
@@ -12,8 +14,7 @@ class RtLinkCSR(Module):
         - ...
     """
 
-    def __init__(self, regs, name, output_dir=None):
-        self.output_dir = output_dir if output_dir is not None else "./"
+    def __init__(self, regs, name, identifier=None):
         self.name = name
         self.regs = regs
 
@@ -27,7 +28,6 @@ class RtLinkCSR(Module):
         address = self.rtlink.o.address[1:]
 
         data_signals_list = []
-        txt_output = "Address, Name, Length\n"
         for idx, r in enumerate(regs):
             if len(r) > 2:
                 reset_value = r[2]
@@ -40,7 +40,6 @@ class RtLinkCSR(Module):
             signal = Signal(bits_sign=r[1], name=r[0], reset=reset_value)
             setattr(self, r[0], signal)
             data_signals_list.append(signal)
-            txt_output += "{}, {}, {}\n".format(idx, *(r[:2]))
 
             if mode == "rw":
                 ld_signal_name = r[0] + "_ld"
@@ -61,5 +60,12 @@ class RtLinkCSR(Module):
                self.rtlink.i.data.eq(data_signals[address]))
         ]
 
-        with open(os.path.join(self.output_dir, "rtlinkcsr_{}.txt".format(self.name)), 'w') as f:
-            f.write(txt_output)
+        if identifier is not None:
+            self.add_rtio_channels(
+                channel=Channel.from_phy(self),
+                device_id=identifier,
+                module="elhep_cores.coredevice.rtlink_csr",
+                class_name="RtlinkCsr",
+                arguments={
+                    "regs": regs
+                })

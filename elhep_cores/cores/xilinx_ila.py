@@ -33,12 +33,12 @@ class ILAProbe(Module):
 def add_xilinx_ila(target, debug_clock, output_dir, depth=1024):
     os.makedirs(os.path.join(output_dir, "gateware"), exist_ok=True)
     tools.write_to_file(os.path.join(output_dir, "gateware", "insert_ila.tcl"), insert_ila_script())
-    target.platform.toolchain.postsynthesis_commands.append("source insert_ila.tcl")
-    target.platform.toolchain.postsynthesis_commands.append(
+    target.platform.toolchain.post_synthesis_commands.append("source insert_ila.tcl")
+    target.platform.toolchain.post_synthesis_commands.append(
         f"batch_insert_ila {{{depth}}}")
     debug_clock.attr.add(("mark_dbg_hub_clk", "true"))
     debug_clock.attr.add(("keep", "true"))
-    target.platform.toolchain.postsynthesis_commands.append(
+    target.platform.toolchain.post_synthesis_commands.append(
         "connect_debug_port dbg_hub/clk [get_nets -hierarchical -filter {mark_dbg_hub_clk == true}]")
 
 
@@ -101,7 +101,7 @@ proc batch_insert_ila { depth } {
         # name is root name of a bus, index is the bit index in the
         # bus
         set name [regsub {\[[[:digit:]]+\]$} $d {}]
-        set index [regsub {^.*\[([[:digit:]]+)\]$} $d {\1}]
+        set index [regsub {^.*\[([[:digit:]]+)\]$} $d {\\1}]
         if {[string is integer -strict $index]} {
             if {![info exists max($name)]} {
                 set max($name) $index

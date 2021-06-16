@@ -17,8 +17,8 @@ SPI_CONFIG = (0*spi.SPI_OFFLINE | 0*spi.SPI_END |
 
 class AD9528:
 
-    def __init__(self, dmgr, spi_device, chip_select, spi_freq=10_000_000, config=None,
-                 core_device="core"):
+    def __init__(self, dmgr, spi_device, chip_select, spi_freq=10_000_000, 
+            config=None, core_device="core"):
         self.core = dmgr.get(core_device)
         self.ref_period_mu = self.core.seconds_to_mu(
             self.core.coarse_ref_period)
@@ -97,6 +97,7 @@ class AD9528:
         self.spi.write(((1 << 15) | (addr & 0x7FFF)) << 16)
 
         self.spi.set_config_mu(flags=SPI_CONFIG | spi.SPI_INPUT | spi.SPI_END, length=8, div=self.div, cs=cs)
+        delay(50 * ns)
         self.spi.write(0)
         delay(50 * ns)
 
