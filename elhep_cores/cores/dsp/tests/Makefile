@@ -14,4 +14,4 @@ include $(shell cocotb-config --makefiles)/Makefile.sim
 
 sim_build/dut.v: $(PWD)/../baseline.py 
 	mkdir -p sim_build
-	dartiq run -m $(PWD)/../../../.. --workspace=sim_build/ --image=$(DARTIQ_IMAGE) "python -m elhep_cores.cores.dsp.baseline"
+	dartiq run -m $(PWD)/../../../.. --workspace=sim_build/ --no-stdin --image=$(DARTIQ_IMAGE) "python -m elhep_cores.cores.dsp.baseline"

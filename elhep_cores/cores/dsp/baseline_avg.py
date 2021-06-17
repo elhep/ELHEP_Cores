@@ -58,5 +58,5 @@ if __name__ == "__main__":
     dut = SignalBaselineAverage(16, 8)
     run_simulation(dut, testbench(dut), vcd_name="SignalBaselineAverage.vcd")
 
-    dut = SignalBaselineAverage(16, 8)
-    print(verilog.convert(dut, {dut.i, dut.o}))
+    # dut = SignalBaselineAverage(16, 8)
+    # print(verilog.convert(dut, {dut.i, dut.o}))
