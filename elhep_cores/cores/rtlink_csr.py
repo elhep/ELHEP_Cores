@@ -5,6 +5,8 @@ from artiq.gateware.rtio import rtlink
 from artiq.gateware.rtio.channel import Channel
 from elhep_cores.helpers.ddb_manager import HasDdbManager
 
+from migen.fhdl import verilog
+
 
 class RtLinkCSR(Module, HasDdbManager):
 
@@ -69,3 +71,44 @@ class RtLinkCSR(Module, HasDdbManager):
                 arguments={
                     "regs": regs
                 })
+
+      
+class SimulationWrapper(Module):
+
+    def __init__(self):
+
+        self.clock_domains.cd_sys = cd_sys = ClockDomain()
+
+        self.io = [
+            cd_sys.clk,
+            cd_sys.rst
+        ]
+
+        regs = [
+            ("offset_level", 15)
+        ]
+
+        self.submodules.dut = dut = RtLinkCSR(regs, "baseline_trigger_generator")
+                                         
+        # self.io += [    
+        #     dut.o,
+        #     dut.i
+        # ]
+
+
+        
+if __name__ == "__main__":
+
+    from migen.build.xilinx import common
+    from elhep_cores.simulation.common import update_tb
+
+    module = SimulationWrapper()
+    so = dict(common.xilinx_special_overrides)
+    so.update(common.xilinx_s7_special_overrides)
+
+    verilog.convert(fi=module,
+                    name="top",
+                    special_overrides=so,
+                    ios={*module.io},
+                    create_clock_domains=True).write('dut.v')
+    update_tb('dut.v')

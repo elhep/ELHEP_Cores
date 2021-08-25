@@ -115,19 +115,22 @@ class SimulationWrapper(Module):
         self.submodules.dut = dut = CircularDAQ(
             data_i=data_i, 
             stb_i=stb_i,
-            trigger_rio_phy=trigger_rio_phy,
+            trigger_dclk=cd_dclk.clk,
+            trigger_id_dclk = trigger_rio_phy,
+            # trigger_rio_phy=trigger_rio_phy,
             circular_buffer_length=128,
-            channel_depth=128,
-            trigger_cnt_len=4)
+            # channel_depth=128,
+            # trigger_cnt_len=4
+        )
 
-        dut.rtlink_channels[0].interface.o.stb.name_override = "rtlink_stb_i"
-        dut.rtlink_channels[0].interface.o.address.name_override = "rtlink_adr_i"
-        dut.rtlink_channels[0].interface.o.data.name_override = "rtlink_data_i"
+        # dut.rtlink_channels[0].interface.o.stb.name_override = "rtlink_stb_i"
+        # dut.rtlink_channels[0].interface.o.address.name_override = "rtlink_adr_i"
+        # dut.rtlink_channels[0].interface.o.data.name_override = "rtlink_data_i"
 
-        dut.rtlink_channels[0].interface.i.stb.name_override = "rtlink_stb_o"
-        dut.rtlink_channels[0].interface.i.data.name_override = "rtlink_data_o"
+        # dut.rtlink_channels[0].interface.i.stb.name_override = "rtlink_stb_o"
+        # dut.rtlink_channels[0].interface.i.data.name_override = "rtlink_data_o"
 
-        dut.trigger_dclk.name_override = "trigger_dclk"
+        # dut.trigger_dclk.name_override = "trigger_dclk"
 
         self.io = {
             cd_dclk.clk,
@@ -135,19 +138,19 @@ class SimulationWrapper(Module):
 
             data_i,
             stb_i,
-            trigger_rio_phy,
+            # trigger_rio_phy,
 
             cd_rio_phy.clk,
             cd_rio_phy.rst,
 
-            dut.rtlink_channels[0].interface.o.stb,
-            dut.rtlink_channels[0].interface.o.address,
-            dut.rtlink_channels[0].interface.o.data,
+            # dut.rtlink_channels[0].interface.o.stb,
+            # dut.rtlink_channels[0].interface.o.address,
+            # dut.rtlink_channels[0].interface.o.data,
 
-            dut.rtlink_channels[0].interface.i.stb,
-            dut.rtlink_channels[0].interface.i.data,
+            # dut.rtlink_channels[0].interface.i.stb,
+            # dut.rtlink_channels[0].interface.i.data,
 
-            dut.trigger_dclk
+            # dut.trigger_dclk
         }
 
 
@@ -163,6 +166,6 @@ if __name__ == "__main__":
     verilog.convert(fi=module,
                     name="top",
                     special_overrides=so,
-                    ios=module.io,
+                    ios={*module.io},
                     create_clock_domains=False).write('dut.v')
     update_tb('dut.v')
