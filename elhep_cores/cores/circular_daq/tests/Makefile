@@ -3,6 +3,8 @@ TOPLEVEL=top
 MODULE=tb_circular_daq
 COMPILE_ARGS=-y$(XILINX_VIVADO)/data/verilog/src/unisims -s glbl
 
+SIM=icarus
+
 ELHEP_CORES=$(PWD)/../../../..
 DARTIQ_IMAGE=dartiq
 

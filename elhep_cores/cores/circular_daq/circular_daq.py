@@ -100,58 +100,82 @@ class SimulationWrapper(Module):
     def __init__(self):
 
         data_width = 22
+        trigger_id_width = 1
 
         data_i = Signal(bits_sign=data_width, name="data_i")
         stb_i  = Signal(name="data_stb_i")
-        trigger_rio_phy = Signal(name="trigger")
 
-        self.data_clk = Signal(name="dclk_clk")
+
+        trigger_rio_phy = Signal(name="trigger")
+        trigger_id = Signal(trigger_id_width)
+
+        # self.data_clk = Signal(name="dclk_clk")
 
         self.clock_domains.cd_rio_phy = cd_rio_phy = ClockDomain()
         self.clock_domains.cd_dclk = cd_dclk = ClockDomain()
 
-        self.comb += [cd_dclk.clk.eq(self.data_clk)]
+        # self.comb += [cd_dclk.clk.eq(self.data_clk)]
 
-        self.submodules.dut = dut = CircularDAQ(
-            data_i=data_i, 
-            stb_i=stb_i,
-            trigger_dclk=cd_dclk.clk,
-            trigger_id_dclk = trigger_rio_phy,
-            # trigger_rio_phy=trigger_rio_phy,
-            circular_buffer_length=128,
-            # channel_depth=128,
-            # trigger_cnt_len=4
-        )
+        self.io = []
 
-        # dut.rtlink_channels[0].interface.o.stb.name_override = "rtlink_stb_i"
-        # dut.rtlink_channels[0].interface.o.address.name_override = "rtlink_adr_i"
-        # dut.rtlink_channels[0].interface.o.data.name_override = "rtlink_data_i"
-
-        # dut.rtlink_channels[0].interface.i.stb.name_override = "rtlink_stb_o"
-        # dut.rtlink_channels[0].interface.i.data.name_override = "rtlink_data_o"
-
-        # dut.trigger_dclk.name_override = "trigger_dclk"
-
-        self.io = {
-            cd_dclk.clk,
-            cd_dclk.rst,
-
-            data_i,
-            stb_i,
-            # trigger_rio_phy,
+        self.io += [
 
             cd_rio_phy.clk,
             cd_rio_phy.rst,
+            cd_dclk.clk,
+            cd_dclk.rst,
 
-            # dut.rtlink_channels[0].interface.o.stb,
-            # dut.rtlink_channels[0].interface.o.address,
-            # dut.rtlink_channels[0].interface.o.data,
+        ]
 
-            # dut.rtlink_channels[0].interface.i.stb,
-            # dut.rtlink_channels[0].interface.i.data,
+        self.submodules.dut = dut = ClockDomainsRenamer("dclk")(CircularDAQ(
+            data_i=data_i, 
+            stb_i=stb_i,
+            trigger_dclk=trigger_rio_phy,
+            trigger_id_dclk = trigger_id,
+            circular_buffer_length=256,
+            # channel_depth=128,
+            # trigger_cnt_len=4
+        ))
+        
+        dut.rtlink.o.stb.name_override = "rtlink_stb_i"
+        dut.rtlink.o.address.name_override = "rtlink_adr_i"
+        dut.rtlink.o.data.name_override = "rtlink_data_i"
+
+        dut.rtlink.i.stb.name_override = "rtlink_stb_o"
+        dut.rtlink.i.data.name_override = "rtlink_data_o"
+
+        # dut.trigger_dclk.name_override = "trigger_dclk"
+
+        self.io+= [
+            # cd_dclk.clk,
+            # cd_dclk.rst,
+
+            data_i,
+            stb_i,
+            trigger_rio_phy,
+            trigger_id,
+
+            # cd_rio_phy.clk,
+            # cd_rio_phy.rst,
+
+            dut.rtlink.o.stb,
+            dut.rtlink.o.address,
+            dut.rtlink.o.data,
+
+            dut.rtlink.i.stb,
+            dut.rtlink.i.data,
 
             # dut.trigger_dclk
-        }
+        ]
+
+        
+        # self.io.append(dut.rtlink.o)
+        # for i in range(8):
+        #     self.io.append(dut.data_o[i])
+        # self.io.append(dut.bitslip_done)
+
+        
+        # self.io = {*self.io}
 
 
 if __name__ == "__main__":

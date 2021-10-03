@@ -95,7 +95,7 @@ def test_daq(dut, pretrigger=5, posttrigger=5):
         if (yield dut.stb_out):
             readout.append((yield dut.data_out))
         yield
-    expected_readout = [trigger_at+i-pretrigger+1 for i in range(pretrigger+posttrigger)]
+    expected_readout = [trigger_at+i-pretrigger for i in range(pretrigger+posttrigger)]
     print(f"{pretrigger} / {posttrigger}")
     print('='*40)
     print(expected_readout)

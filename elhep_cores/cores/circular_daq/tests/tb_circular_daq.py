@@ -89,6 +89,7 @@ class TbCircularDaq:
         self.dut.dclk_rst <= 0
         self.dut.rio_phy_rst <= 0
         self.dut.trigger <= 0
+        self.dut.trigger_id <= 0
 
         self.dut._log.info("Waiting initial 120 ns")
         yield Timer(120, 'ns')
@@ -112,13 +113,13 @@ class TbCircularDaq:
             yield self.dclk_re
             if self.dut.data_stb_i == 1:
                 self.monitor_data.append((dclk_num, int(self.dut.data_i.value.binstr, 2)))
-            if self.dut.trigger_dclk == 1 and trigger_dclk_r == 0:
+            if self.dut.trigger == 1 and trigger_dclk_r == 0:
                 self.monitor_trigger.append((dclk_num, trig_num))
                 trig_num += 1
                 if trig_num >= 16:
                     trig_num = 0
             dclk_num += 1
-            trigger_dclk_r = int(self.dut.trigger_dclk)
+            trigger_dclk_r = int(self.dut.trigger)
 
     @cocotb.coroutine
     def random_data_generator(self, sep_min=1, sep_max=14):
