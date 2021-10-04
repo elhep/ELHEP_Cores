@@ -114,6 +114,10 @@ class SimulationWrapper(Module):
         self.clock_domains.cd_rio_phy = cd_rio_phy = ClockDomain()
         self.clock_domains.cd_dclk = cd_dclk = ClockDomain()
 
+        
+        trigger_rio_phy = Signal(name="trigger")
+        trigger_id = Signal(trigger_id_width)
+
         # self.comb += [cd_dclk.clk.eq(self.data_clk)]
 
         self.io = []

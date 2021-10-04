@@ -64,7 +64,7 @@ class TbCircularDaq:
         link_stb <= 0x1
         yield FallingEdge(link_clock)
         link_stb <= 0x0
-
+        
     @cocotb.coroutine
     def rtlink_collector(self, channel, callback):
         link_clock = self.rtlink[channel]["clock"]
@@ -107,17 +107,14 @@ class TbCircularDaq:
     @cocotb.coroutine
     def data_trigger_monitor(self):
         dclk_num = 0
-        trig_num = 1
+        # trig_id = 0
         trigger_dclk_r = 0
         while True:
             yield self.dclk_re
             if self.dut.data_stb_i == 1:
                 self.monitor_data.append((dclk_num, int(self.dut.data_i.value.binstr, 2)))
             if self.dut.trigger == 1 and trigger_dclk_r == 0:
-                self.monitor_trigger.append((dclk_num, trig_num))
-                trig_num += 1
-                if trig_num >= 16:
-                    trig_num = 0
+                self.monitor_trigger.append((dclk_num, int(self.dut.trigger_id)))
             dclk_num += 1
             trigger_dclk_r = int(self.dut.trigger)
 
@@ -153,25 +150,25 @@ class TbCircularDaq:
 
     def verify_data(self, pretrigger, posttrigger):
         input_data = []
-        for trigger_idx, trigger_num in self.monitor_trigger:
+
+        for trigger_idx, trigger_id in self.monitor_trigger:
             data_idx_min = trigger_idx-pretrigger
             data_idx_max = trigger_idx+posttrigger
             data_for_trigger = list(filter(lambda x: data_idx_min <= x[0] <= data_idx_max, self.monitor_data))
             self.dut._log.debug([trigger_idx-x[0] for x in data_for_trigger])
-            input_data.append((trigger_num, [x[1] for x in list(data_for_trigger)]))
-                
+            input_data.append((trigger_id, [x[1] for x in list(data_for_trigger)]))
+                 
         self.collected_data = [((x >> 22) & 0xF, x & 0x3FFFFF) for x in self.collected_data]
+        
         output_data = []
-        tmp = []
-        trigcnt_val = self.collected_data[0][0]
-        for x in self.collected_data:
-            if trigcnt_val == x[0]:
-                tmp.append(x[1])
-            else:
-                output_data.append((trigcnt_val, tmp))
-                trigcnt_val = x[0]
-                tmp = [x[1]]
-        output_data.append((trigcnt_val, tmp))
+
+        x = pretrigger + 1 + posttrigger
+
+        for j in range(len(self.monitor_trigger)):
+            tmp = []
+            for i in range(x):
+                tmp.append(self.collected_data[(j*x) + i][1])
+            output_data.append((self.collected_data[j*x][0], tmp))
 
         self.dut._log.debug(input_data)
         self.dut._log.debug(output_data)
@@ -210,9 +207,12 @@ class TbCircularDaq:
             yield self.generate_trigger()
             yield Timer(randint(500, 5000), 'ns')
 
+
         dgen.kill()
         dmon.kill()
         collector.kill()
+
+        
 
         self.verify_data(pretrigger, posttrigger)
 
