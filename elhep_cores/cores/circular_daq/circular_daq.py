@@ -95,7 +95,6 @@ class CircularDAQ(Module):
 
 class SimulationWrapper(Module):
 
-    # TODO: Update simulation
 
     def __init__(self):
 
