@@ -1,4 +1,6 @@
 import os
+
+from migen import *
 from migen.fhdl import verilog
 
 
@@ -25,8 +27,33 @@ endmodule
         f.write(design)
 
 
-def generate_verilog(f, output_file):
+def get_record_signals(record):
+    signals = set()
+    for k, v in record.__dict__.items():
+        if isinstance(v, Signal):
+            signals.add(v)
+        elif isinstance(v, Record):
+            signals = signals.union(get_record_signals(v))
+    return signals
+
+
+def get_stream_signals(endpoint):
+    ios = {getattr(endpoint, x) for x in ["stb", "ack", "eop"]}
+    ios = ios.union(get_record_signals(endpoint.payload))
+    return ios
+
+
+def get_ios(f):
+    """Finds all IOs following _i/_o suffixes and includes sink/source fields"""
     ios = {getattr(f, x) for x in f.__dict__.keys() if x.endswith("_o") or x.endswith("_i")}
-    hdl_code = verilog.convert(f, ios).write(output_file)
+    if hasattr(f, "source"):
+        ios = ios.union(get_stream_signals(f.source))
+    if hasattr(f, "sink"):
+        ios = ios.union(get_stream_signals(f.sink))
+    return ios
+
+
+def generate_verilog(f, output_file):
+    verilog.convert(f, get_ios(f)).write(output_file)
     update_tb(output_file)
 
