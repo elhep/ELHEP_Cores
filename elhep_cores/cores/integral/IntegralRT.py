@@ -28,7 +28,7 @@ class IntegralRT(Module):
     def __init__(self, data_in, baseline_in, stb_i, integral_length=7):
 
         
-        iiface_width = len(data_in + ceil(log2(integral_length)))
+        iiface_width = len(data_in) + (ceil(log2(integral_length)))
         assert iiface_width <= 32, f"Data width ({iiface_width}) must be <= 32"
 
         self.data_in = data_in

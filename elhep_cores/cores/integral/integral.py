@@ -24,14 +24,15 @@ class Integral(Module):
         
         
         
-        self.baseline_in = Signal(data_width)   
-        self.data_in = Signal(data_width)      
+        self.baseline_in = Signal(data_width+1)   
+        self.data_in = Signal(data_width+1)      
         self.stb_i = Signal()        
         self.cnt = Signal(max=length+1)
         self.data_out = Signal(data_width + ceil(log2(length)))
         self.stb_o = Signal()   
+        self.overflow_o = Signal()   
         
-        reg = Array(Signal(data_width) for a in range(length))
+        reg = Array(Signal(data_width+1) for a in range(length))
 
         for i in range(length - 1):
             self.sync += [
@@ -47,14 +48,26 @@ class Integral(Module):
 
         sum = 0
         for i in range(length):
+            # if self.cnt == length:
+            #     sum = reg[0]
+            # else:
             sum = sum + reg[i] 
 
         self.sync += [
             If(self.cnt == length, 
-                self.data_out.eq(sum),
-                self.cnt.eq(0),
+                self.data_out.eq(sum), 
+                If(self.stb_i == 1, 
+                    self.cnt.eq(1)).Else(
+                        self.cnt.eq(0)
+                    ),
                 self.stb_o.eq(1)).Else(
                     self.stb_o.eq(0)
+                ),
+           
+
+            If(sum>(2**data_width)*length-1,
+                self.overflow_o.eq(1)).Else(
+                    self.overflow_o.eq(0)
                 )
         ]
 
