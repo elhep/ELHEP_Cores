@@ -3,17 +3,17 @@
 import argparse
 
 from migen import *
-from elhep_cores.platforms import afck1v1
 from migen.genlib.resetsync import AsyncResetSynchronizer
 
 from misoc.cores.liteeth_mini.mac import LiteEthMAC
-from misoc.cores.liteeth_mini.phy.k7_1000basex import K7_1000BASEX
 from misoc.cores import spi_flash
-
 from misoc.cores.sdram_settings import MT41K512M8
 from misoc.cores.sdram_phy import k7ddrphy
 from misoc.integration.soc_sdram import *
 from misoc.integration.builder import *
+
+from elhep_cores.platforms import afck1v1
+from elhep_cores.cores.afck_pcspma.afck_pcspma import AfckPCSPMA
 
 
 # CRG ----------------------------------------------------------------------------------------------
@@ -85,25 +85,18 @@ class _CRG(Module):
 
 class BaseSoC(SoCSDRAM):
 
-    def __init__(self, sdram_controller_type="minicon", crg=None, spi_flash_type="1x", integrated_rom_size=None, **kwargs):
+    def __init__(self, sdram_controller_type="minicon", crg=None, integrated_rom_size=0, **kwargs):
         platform = afck1v1.Platform()
-
-        if not integrated_rom_size:
-            cpu_reset_address = 0x800000
-        else:
-            cpu_reset_address = 0x0
-
-        SoCSDRAM.__init__(self, platform, 
-                          clk_freq=125000000,
-                          cpu_reset_address=cpu_reset_address,
-                          integrated_rom_size=integrated_rom_size,
-                          **kwargs)
+        SoCSDRAM.__init__(self, 
+            platform          = platform, 
+            clk_freq          = 125000000,
+            integrated_rom_size = integrated_rom_size,
+            cpu_reset_address = 0x000000 if integrated_rom_size else 0xaf0000, 
+            **kwargs)
         if crg is None:
             self.submodules.crg = _CRG(platform)
         else:
             self.submodules.crg = crg(platform)
-
-        print(self.cpu_reset_address)
 
         # sdram
         self.submodules.ddrphy = k7ddrphy.K7DDRPHY(platform.request("ddram"))
@@ -112,27 +105,24 @@ class BaseSoC(SoCSDRAM):
                             sdram_controller_type,
                             sdram_module.geom_settings,
                             sdram_module.timing_settings)
-        self.csr_devices += ["ddrphy"]
-        self.flash_boot_address = 0x880000
+        self.csr_devices.append("ddrphy")
+        
+        self.flash_boot_address = 0xb40000
         if not self.integrated_rom_size:
-            print("Building with SPI Flash")
-            spiflash_pads = platform.request("spiflash{}".format(spi_flash_type))
+            spiflash_pads = platform.request("spiflash")
             spiflash_pads.clk = Signal()
             self.specials += Instance("STARTUPE2",
                                   i_CLK=0, i_GSR=0, i_GTS=0, i_KEYCLEARB=0, i_PACK=0,
-                                  i_USRCCLKO=spiflash_pads.clk, i_USRCCLKTS=0, i_USRDONEO=1, i_USRDONETS=1)
-            if spi_flash_type == "1x":
-                self.submodules.spiflash = spi_flash.SpiFlashSingle(spiflash_pads, dummy=8, div=8)
-            else:                
-                self.submodules.spiflash = spi_flash.SpiFlash(spiflash_pads, div=3)
+                                  i_USRCCLKO=spiflash_pads.clk, i_USRCCLKTS=0, i_USRDONEO=1, i_USRDONETS=1) 
+            self.comb += platform.request("spiflash_fcsb").eq(1)
+            self.submodules.spiflash = spi_flash.SpiFlashSingle(spiflash_pads, dummy=8, div=4,
+                endianness="little" if self.cpu_type == "vexriscv" else "big")
             self.config["SPIFLASH_PAGE_SIZE"] = 256
-            self.config["SPIFLASH_SECTOR_SIZE"] = 0x40000
-
-            self.register_rom(self.spiflash.bus, 16 * 1024 * 1024)
+            self.config["SPIFLASH_SECTOR_SIZE"] = 0x10000
+            self.flash_boot_address = 0xb40000
+            self.register_rom(self.spiflash.bus, 16*1024*1024)
             self.csr_devices.append("spiflash")
-            self.flash_boot_address = 0x880000
-        else:
-            print("Building with integrated ROM")
+
 
 # EthernetSoC ------------------------------------------------------------------------------------------
 
@@ -145,10 +135,12 @@ class MiniSoC(BaseSoC):
     def __init__(self, ethmac_nrxslots=2, ethmac_ntxslots=2, **kwargs):
         BaseSoC.__init__(self, **kwargs)
 
-        self.submodules.ethphy = K7_1000BASEX(self.platform.request("mgt116_clk1"), self.platform.request("mgt116", 3), 125e6)
-        self.platform.add_period_constraint(self.platform.lookup_request("mgt116_clk1"), 1e9 / 125e6)
-        self.csr_devices += ["ethphy"]
-        
+        self.submodules.ethphy = AfckPCSPMA(
+            platform=self.platform, 
+            clk_pads=self.platform.request("mgt116_clk1"), 
+            data_pads=self.platform.request("mgt116", 3), 
+            sys_clk_freq=125e6,
+            cd_idelayctrl="clk200")
         self.submodules.ethmac = LiteEthMAC(
             phy=self.ethphy, 
             dw=32,
@@ -162,14 +154,8 @@ class MiniSoC(BaseSoC):
         self.csr_devices += ["ethmac"]
         self.interrupt_devices.append("ethmac")
 
-        self.ethphy.cd_eth_rx.clk.attr.add("keep")
-        self.ethphy.cd_eth_tx.clk.attr.add("keep")
-        self.ethphy.txoutclk.attr.add("keep")
-        self.ethphy.rxoutclk.attr.add("keep")
         self.platform.add_period_constraint(self.ethphy.cd_eth_rx.clk, 1e9 / 125e6)
         self.platform.add_period_constraint(self.ethphy.cd_eth_tx.clk, 1e9 / 125e6)
-        self.platform.add_period_constraint(self.ethphy.txoutclk, 1e9 / 125e6 * 2)
-        self.platform.add_period_constraint(self.ethphy.rxoutclk, 1e9 / 125e6 * 2)
         self.platform.add_false_path_constraints(
             self.crg.cd_sys.clk,
             self.ethphy.cd_eth_rx.clk,
@@ -178,7 +164,7 @@ class MiniSoC(BaseSoC):
 
 def soc_afck1v1_args(parser):
     soc_sdram_args(parser)
-    parser.add_argument("--spi-flash-type", action="store", dest="flash_type", default="1x", type=str,
+    parser.add_argument("--spi-flash-type", action="store", dest="flash_type", default="4x", type=str,
                         choices=["1x", "2x", "4x"], help="SPI Flash type (1x, 2x, 4x)")
 
 

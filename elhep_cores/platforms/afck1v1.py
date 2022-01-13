@@ -291,29 +291,23 @@ _io = [
         Subsignal("sda", Pins("G19")),
         IOStandard("LVCMOS25")),
 
-    # Dual and quad modes not supported by M25P128 memories
     ("spiflash4x", 0,
         Subsignal("cs_n", Pins("U19")),
-        Subsignal("dq", Pins("P24 R25 R20 R21")),
-        IOStandard("LVCMOS25")
-     ),
-    
-    ("spiflash2x", 0,
-        Subsignal("cs_n", Pins("U19")),
-        Subsignal("dq", Pins("P24 R25")),
-        Subsignal("wp", Pins("R20")),
-        Subsignal("hold", Pins("R21")),
+        Subsignal("dq", Pins("P24", "R25", "R20", "R21")),
         IOStandard("LVCMOS25")
     ),
 
-    ("spiflash1x", 0,
-        Subsignal("cs_n", Pins("U19")),
+    ("spiflash", 0,
+        Subsignal("cs_n", Pins("U19")), # B27 / U19
         Subsignal("mosi", Pins("P24")),
         Subsignal("miso", Pins("R25")),
         Subsignal("wp", Pins("R20")),
         Subsignal("hold", Pins("R21")),
         IOStandard("LVCMOS25")
     ),
+
+    # Intentionally swapped cs_n with fcsb. 
+    ("spiflash_fcsb", 0, Pins("B27"), IOStandard("LVCMOS25")),
 
     ("led", 0, Pins("G23"), IOStandard("LVCMOS25")),
     ("led", 1, Pins("G25"), IOStandard("LVCMOS25")),
@@ -686,12 +680,19 @@ class Platform(XilinxPlatform):
     default_clk_period = 50.0
 
     def __init__(self):
-
         XilinxPlatform.__init__(self, "xc7k325tffg900-3", _io, _connectors, toolchain="vivado")
+        # self.toolchain.bitstream_commands.extend([
+            # "set_property BITSTREAM.CONFIG.OVERTEMPPOWERDOWN Enable [current_design]",
+            # "set_property BITSTREAM.GENERAL.COMPRESS TRUE [current_design]",
+            # "set_property CONFIG_MODE SPIx1 [current_design]",
+            # "set_property CFGBVS VCCO [current_design]",
+            # "set_property CONFIG_VOLTAGE 2.5 [current_design]",
+            # ])
         self.toolchain.bitstream_commands.extend([
             "set_property BITSTREAM.CONFIG.OVERTEMPPOWERDOWN Enable [current_design]",
             "set_property BITSTREAM.GENERAL.COMPRESS TRUE [current_design]",
-            "set_property CONFIG_MODE SPIx1 [current_design]",
+            "set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4 [current_design]",
+            "set_property BITSTREAM.CONFIG.UNUSEDPIN Pullnone [current_design]",
             "set_property CFGBVS VCCO [current_design]",
             "set_property CONFIG_VOLTAGE 2.5 [current_design]",
-            ])
+        ])    

@@ -262,7 +262,6 @@ def main():
     soc_afck1v1_args(parser)
     parser.set_defaults(output_dir="artiq_afck1v1")
     args = parser.parse_args()
-
     soc = StandaloneBase(**soc_afck1v1_argdict(args))
     build_artiq_soc(soc, builder_argdict(args))
 
