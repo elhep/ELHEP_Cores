@@ -146,10 +146,10 @@ class StandaloneBase(MiniSoC, AMPSoC, HasDdbManager):
         add_identifier(self)
         self.output_dir = output_dir
         
-        # i2c = self.platform.request("i2c")
-        self.i2c_buses = []
-        #     [i2c.scl, i2c.sda, "afck_i2c"]
-        # ]
+        i2c = self.platform.request("i2c")
+        self.i2c_buses = [
+            [i2c.scl, i2c.sda, "afck_i2c"]
+        ]
 
         self.add_design()
         

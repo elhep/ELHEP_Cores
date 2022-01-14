@@ -142,7 +142,7 @@ class FmcAdc100M10b16chaTdc(_FMC):
         # CFD DAC I2C
 
         dac_i2c = target.platform.request(cls.signal_name("dac_i2c", fmc))
-        # bus_id = target.add_i2c_bus(dac_i2c.scl, dac_i2c.sda, f"FMC{fmc} DAC I2C")
+        bus_id = target.add_i2c_bus(dac_i2c.scl, dac_i2c.sda, f"FMC{fmc} DAC I2C")
         target.submodules.i2c = gpio.GPIOTristate([dac_i2c.scl, dac_i2c.sda])
         target.csr_devices.append("i2c")
         
