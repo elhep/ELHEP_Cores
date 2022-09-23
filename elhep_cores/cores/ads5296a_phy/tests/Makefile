@@ -11,9 +11,10 @@ ELHEP_CORES=$(PWD)/../../../..
 DARTIQ_IMAGE=dartiq
 
 export PYTHONPATH := $(PYTHONPATH):$(ELHEP_CORES)
+# export LM_LICENSE_FILE := 1717@192.168.95.162
 
 include $(shell cocotb-config --makefiles)/Makefile.sim
 
 sim_build/dut.v: $(PWD)/../ads5296a.py $(PWD)/../../xilinx.py
 	mkdir -p sim_build
-	dartiq run -m $(PWD)/../../../.. --workspace=sim_build/ --image=$(DARTIQ_IMAGE) "python -m elhep_cores.cores.ads5296a_phy.ads5296a"
+	dartiq run -m $(PWD)/../../../.. --workspace=sim_build/ --image=$(DARTIQ_IMAGE) "python -m elhep_cores.cores.ads5296a_phy.ads5296a" --copy-env-var LM_LICENSE_FILE

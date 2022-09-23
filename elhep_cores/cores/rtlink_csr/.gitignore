@@ -1,0 +1,3 @@
+tests/**
+!tests/Makefile
+!tests/tb_ads5296a_xs7.py

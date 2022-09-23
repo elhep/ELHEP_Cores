@@ -196,20 +196,21 @@ class SimulationWrapper(Module):
             self.io.append(dut.data_o[i])
         self.io.append(dut.bitslip_done)
 
-        dut.rtio_channels[0].interface.o.stb.name_override = "rtlink_stb_i"
-        dut.rtio_channels[0].interface.o.data.name_override = "rtlink_data_i"
-        dut.rtio_channels[0].interface.o.address.name_override = "rtlink_address_i"
 
-        dut.rtio_channels[0].interface.i.stb.name_override = "rtlink_stb_o"
-        dut.rtio_channels[0].interface.i.data.name_override = "rtlink_data_o"
+        # dut.rtio_channels[0].interface.o.stb.name_override = "rtlink_stb_i"
+        # dut.rtio_channels[0].interface.o.data.name_override = "rtlink_data_i"
+        # dut.rtio_channels[0].interface.o.address.name_override = "rtlink_address_i"
 
-        self.io += [
-            dut.rtio_channels[0].interface.o.stb,
-            dut.rtio_channels[0].interface.o.data,
-            dut.rtio_channels[0].interface.o.address,
-            dut.rtio_channels[0].interface.i.stb,
-            dut.rtio_channels[0].interface.i.data
-        ]
+        # dut.rtio_channels[0].interface.i.stb.name_override = "rtlink_stb_o"
+        # dut.rtio_channels[0].interface.i.data.name_override = "rtlink_data_o"
+
+        # self.io += [
+        #     dut.rtio_channels[0].interface.o.stb,
+        #     dut.rtio_channels[0].interface.o.data,
+        #     dut.rtio_channels[0].interface.o.address,
+        #     dut.rtio_channels[0].interface.i.stb,
+        #     dut.rtio_channels[0].interface.i.data
+        # ]
 
         self.io = {*self.io}
 
